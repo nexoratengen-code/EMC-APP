@@ -1,0 +1,17 @@
+services:
+  - type: web
+    name: tradeport-ea-web
+    env: docker
+    plan: free
+    autoDeploy: true
+    healthCheckPath: /health
+    envVars:
+      - key: EXPO_NO_TELEMETRY
+        value: "1"
+      - key: NODE_ENV
+        value: "production"
+      - key: RENDER
+        value: "true"
+      - key: EXPO_PUBLIC_API_BASE_URL
+        value: "https://eamobileconnect.com/admin"
+
