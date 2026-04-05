@@ -1,4 +1,4 @@
-// Service Worker for Trade Port EA App
+// Service Worker for EA Mobile Connect App
 // This helps the app load immediately from cache, reducing dependency on server startup
 
 const CACHE_NAME = 'tradeport-ea-v1';

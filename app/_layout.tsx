@@ -349,7 +349,7 @@ export default function RootLayout() {
   }, []);
 
   if (!appIsReady) {
-    return <CustomLoadingScreen message="Initializing Trade Port EA..." />;
+    return <CustomLoadingScreen message="Initializing EA Mobile Connect..." />;
   }
 
   return (

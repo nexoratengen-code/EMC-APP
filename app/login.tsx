@@ -139,7 +139,7 @@ export default function LoginScreen() {
                   resizeMode="contain"
                 />
               </View>
-              <Text style={styles.appName}>Trade Port</Text>
+              <Text style={styles.appName}>EA Mobile Connect</Text>
               <Text style={styles.tagline}>Algorithmic Trading Platform</Text>
             </Animated.View>
 
@@ -198,7 +198,7 @@ export default function LoginScreen() {
               </TouchableOpacity>
             </View>
 
-            <Text style={styles.footer}>Powered by Trade Port EA</Text>
+            <Text style={styles.footer}>Powered by EA Mobile Connect</Text>
           </Animated.View>
         </ScrollView>
       </KeyboardAvoidingView>

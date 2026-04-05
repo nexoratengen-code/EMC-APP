@@ -7,9 +7,9 @@ const assetsPath = path.join(__dirname, '..', 'assets', 'images');
 
 // Create manifest.json
 const manifest = {
-  "name": "Trade Port EA",
-  "short_name": "Trade Port EA",
-  "description": "Automated Forex Trading Trade Port EA App",
+  "name": "EA Mobile Connect",
+  "short_name": "EA Mobile Connect",
+  "description": "Automated Forex Trading EA Mobile Connect App",
   "start_url": "/",
   "display": "standalone",
   "orientation": "portrait",
@@ -93,7 +93,7 @@ if (fs.existsSync(indexPath)) {
   <link rel="manifest" href="/manifest.json">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black">
-  <meta name="apple-mobile-web-app-title" content="Trade Port EA">
+  <meta name="apple-mobile-web-app-title" content="EA Mobile Connect">
   <link rel="apple-touch-icon" href="/assets/images/icon.png">
   <link rel="apple-touch-icon" sizes="57x57" href="/assets/images/icon.png">
   <link rel="apple-touch-icon" sizes="60x60" href="/assets/images/icon.png">

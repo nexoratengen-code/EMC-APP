@@ -6,12 +6,12 @@ interface CustomLoadingScreenProps {
     message?: string;
 }
 
-export function CustomLoadingScreen({ message = "Loading Trade Port EA..." }: CustomLoadingScreenProps) {
+export function CustomLoadingScreen({ message = "Loading EA Mobile Connect..." }: CustomLoadingScreenProps) {
     return (
         <View style={styles.container}>
             <View style={styles.content}>
                 <RobotLogo size={120} />
-                <Text style={styles.title}>TRADE PORT EA</Text>
+                <Text style={styles.title}>EA MOBILE CONNECT</Text>
                 <Text style={styles.message}>{message}</Text>
 
                 {/* Loading dots animation */}
