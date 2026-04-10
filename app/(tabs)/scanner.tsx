@@ -5,7 +5,7 @@ import { ArrowLeft } from 'lucide-react-native';
 import { router } from 'expo-router';
 import { useTheme } from '@/providers/theme-provider';
 
-const SCANNER_URL = 'https://fxsynapse-ai.vercel.app/partner/trade-port-scanner';
+const SCANNER_URL = 'https://fxsynapse-ai.vercel.app/partner/eamobileconnect';
 
 export default function ScannerScreen() {
   const { theme } = useTheme();
