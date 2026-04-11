@@ -371,7 +371,7 @@ export function DynamicIsland({ visible, newSignal, onSignalDismiss }: DynamicIs
             <View style={styles.colorRow}>
               {COLORS.map(c => (
                 <TouchableOpacity key={c} style={[styles.colorDot, { borderColor: themeName === c ? theme.accent : 'transparent' }]} onPress={() => setThemeName(c)} activeOpacity={0.7}>
-                  <View style={[styles.colorIn, { backgroundColor: c === 'red' ? '#FF1A1A' : c === 'blue' ? '#1A8FFF' : c === 'green' ? '#1AFF5E' : c === 'purple' ? '#A855F7' : c === 'orange' ? '#FF8C1A' : '#06D6E0' }]} />
+                  <View style={[styles.colorIn, { backgroundColor: c === 'red' ? '#8B5CF6' : c === 'blue' ? '#1A8FFF' : c === 'green' ? '#1AFF5E' : c === 'purple' ? '#8B5CF6' : c === 'orange' ? '#FF8C1A' : '#06D6E0' }]} />
                 </TouchableOpacity>
               ))}
             </View>

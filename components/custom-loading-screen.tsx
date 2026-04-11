@@ -36,7 +36,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     ...(Platform.OS === 'web' && {
-      backgroundImage: 'linear-gradient(135deg, rgba(255, 26, 26, 0.9) 0%, rgba(255, 26, 26, 0.5) 30%, rgba(255, 26, 26, 0.1) 65%, rgba(0, 0, 0, 0.95) 90%, rgba(0, 0, 0, 1) 100%)',
+      backgroundImage: 'linear-gradient(135deg, rgba(139, 92, 246, 0.9) 0%, rgba(139, 92, 246, 0.5) 30%, rgba(139, 92, 246, 0.1) 65%, rgba(0, 0, 0, 0.95) 90%, rgba(0, 0, 0, 1) 100%)',
     }),
   },
     content: {
@@ -46,15 +46,15 @@ const styles = StyleSheet.create({
     title: {
         fontSize: 28,
         fontWeight: '800',
-        color: '#FF1A1A',
+        color: '#8B5CF6',
         marginTop: 24,
         letterSpacing: 3,
-        textShadowColor: '#FF1A1A',
+        textShadowColor: '#8B5CF6',
         textShadowOffset: { width: 0, height: 0 },
         textShadowRadius: 15,
         textAlign: 'center',
         ...(Platform.OS === 'web' && {
-          filter: 'drop-shadow(0 0 10px rgba(255, 26, 26, 0.6))',
+          filter: 'drop-shadow(0 0 10px rgba(139, 92, 246, 0.6))',
         }),
     },
     message: {
@@ -73,9 +73,9 @@ const styles = StyleSheet.create({
         width: 10,
         height: 10,
         borderRadius: 5,
-        backgroundColor: '#FF1A1A',
+        backgroundColor: '#8B5CF6',
         marginHorizontal: 6,
-        shadowColor: '#FF1A1A',
+        shadowColor: '#8B5CF6',
         shadowOffset: { width: 0, height: 0 },
         shadowOpacity: 0.8,
         shadowRadius: 8,

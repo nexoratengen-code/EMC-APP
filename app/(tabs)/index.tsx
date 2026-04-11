@@ -560,7 +560,7 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 28,
     fontWeight: '800',
-    color: '#FF1A1A',
+    color: '#8B5CF6',
     marginTop: 20,
     letterSpacing: 3,
     textAlign: 'center',

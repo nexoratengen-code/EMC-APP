@@ -7,10 +7,10 @@ import { useSidebar } from '@/providers/sidebar-provider';
 import { Menu } from 'lucide-react-native';
 
 const THEME_OPTIONS: { name: ThemeName; label: string; preview: string }[] = [
-  { name: 'red', label: 'Red', preview: '#FF1A1A' },
+  { name: 'red', label: 'Red', preview: '#8B5CF6' },
   { name: 'blue', label: 'Blue', preview: '#1A8FFF' },
   { name: 'green', label: 'Green', preview: '#1AFF5E' },
-  { name: 'purple', label: 'Purple', preview: '#A855F7' },
+  { name: 'purple', label: 'Purple', preview: '#8B5CF6' },
   { name: 'orange', label: 'Orange', preview: '#FF8C1A' },
   { name: 'cyan', label: 'Cyan', preview: '#06D6E0' },
 ];

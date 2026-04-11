@@ -1,8 +1,8 @@
 export default {
   // Primary Colors
-  primary: '#FF1A1A',        // Vibrant cyberpunk red
-  primaryDark: '#CC0000',    // Darker red for hover states
-  primaryLight: '#FF4D4D',   // Lighter red for accents
+  primary: '#8B5CF6',        // EMC site purple
+  primaryDark: '#7C3AED',    // Darker purple for hover states
+  primaryLight: '#A78BFA',   // Lighter purple for accents
 
   // Background Colors
   background: '#000000',     // Pure black
@@ -17,23 +17,23 @@ export default {
   textInverse: '#000000',   // Black text on light backgrounds
 
   // Border & Outline Colors
-  border: '#FF1A1A',        // Primary red borders
+  border: '#8B5CF6',        // Primary purple borders
   borderSecondary: '#333333', // Secondary borders
   borderMuted: '#1A1A1A',   // Muted borders
 
   // Status Colors
   success: '#00FF88',       // Cyberpunk green
-  error: '#FF1A1A',         // Red error
+  error: '#8B5CF6',         // Purple error
   warning: '#FFB800',       // Cyberpunk orange
   info: '#00BFFF',          // Cyberpunk blue
 
   // Glow & Shadow Colors
-  glow: '#FF1A1A',          // Red glow
+  glow: '#8B5CF6',          // Purple glow
   shadow: 'rgba(0, 0, 0, 0.5)', // Black shadow
-  shadowRed: 'rgba(255, 26, 26, 0.3)', // Red shadow
+  shadowRed: 'rgba(139, 92, 246, 0.3)', // Purple shadow
 
   // Gradient Colors
-  gradientStart: 'rgba(255, 26, 26, 0.9)', // Gradient start
+  gradientStart: 'rgba(139, 92, 246, 0.9)', // Gradient start
   gradientEnd: 'rgba(0, 0, 0, 1)',          // Gradient end
-  gradientMid: 'rgba(255, 26, 26, 0.3)',   // Gradient middle
+  gradientMid: 'rgba(139, 92, 246, 0.3)',   // Gradient middle
 };
