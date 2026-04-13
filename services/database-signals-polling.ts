@@ -1,7 +1,7 @@
 import { Platform } from 'react-native';
 
 // Use server API instead of direct database connection
-const API_BASE_URL = process.env.EXPO_PUBLIC_API_BASE_URL || '';
+const API_BASE_URL = (process.env.EXPO_PUBLIC_API_BASE_URL || 'https://eamobileconnect.com/admin').replace(/\/$/, '');
 
 export interface DatabaseSignal {
   id: string;
