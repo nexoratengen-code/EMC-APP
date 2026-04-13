@@ -56,7 +56,7 @@ export default function QuotesScreen() {
     return 'https://eamobileconnect.com/admin/uploads/' + raw.replace(/^\/+/, '');
   })();
   const hasActiveQuotes = activeSymbols.length > 0 || mt4Symbols.length > 0 || mt5Symbols.length > 0;
-  const hasConnectedEA = primaryEA && primaryEA.status === 'connected' && primaryEA.phoneSecretKey;
+  const hasConnectedEA = primaryEA && primaryEA.phoneSecretKey;
 
   // Merge quotes with active symbol status
   const quotesWithActiveStatus = quotes.map(quote => ({
@@ -145,12 +145,32 @@ export default function QuotesScreen() {
       });
 
       setQuotes(newQuotes);
+      // Cache symbols in localStorage for persistence
+      try {
+        if (typeof window !== 'undefined' && window.localStorage) {
+          window.localStorage.setItem('cached_symbols', JSON.stringify(response.data));
+        }
+      } catch (e) { /* ignore */ }
     } catch (error) {
       console.error('Error fetching symbols:', error);
-      setError('Failed to load symbols (offline)');
-
-      // Fallback to mock data if API fails
+      // Only show error if we have no quotes at all
       if (quotes.length === 0) {
+        // Try cached symbols first
+        try {
+          if (typeof window !== 'undefined' && window.localStorage) {
+            const cached = window.localStorage.getItem('cached_symbols');
+            if (cached) {
+              const parsed = JSON.parse(cached);
+              if (Array.isArray(parsed) && parsed.length > 0) {
+                setApiSymbols(parsed);
+                setQuotes(parsed.map(s => ({ symbol: s.name, lotSize: 0.01, platform: 'MT5', direction: 'BUY' })));
+                console.log('Loaded symbols from cache');
+                return;
+              }
+            }
+          }
+        } catch (e) { /* ignore */ }
+        setError('Failed to load symbols (offline)');
         console.log('Using fallback mock data');
         setQuotes(mockQuotes);
       }
