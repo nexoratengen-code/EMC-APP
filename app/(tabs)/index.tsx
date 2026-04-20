@@ -2,6 +2,7 @@ import React, { useState, useMemo, useCallback, useEffect, useRef } from 'react'
 import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Image, ImageBackground, Platform, Dimensions, SafeAreaView, Animated, RefreshControl } from 'react-native';
 import { Play, Square, TrendingUp, Trash2, Plus, Menu, BarChart3 } from 'lucide-react-native';
 import { router } from 'expo-router';
+import { LinearGradient } from 'expo-linear-gradient';
 import { RobotLogo } from '@/components/robot-logo';
 import { PageBackground } from '@/components/page-background';
 
@@ -231,6 +232,95 @@ export default function HomeScreen() {
           </TouchableOpacity>
         </View>
       </View>
+    );
+  }
+
+  if (heroHidden && !isMech) {
+    return (
+      <SafeAreaView style={styles.container}>
+        {primaryEAImage ? (
+          <Image
+            source={{ uri: primaryEAImage }}
+            style={styles.hideBackdropImage}
+            resizeMode="cover"
+          />
+        ) : (
+          <View style={styles.hideBackdropFallback}>
+            <RobotLogo size={Math.min(width * 0.7, 320)} />
+          </View>
+        )}
+
+        <LinearGradient
+          colors={['rgba(0,0,0,0)', 'rgba(0,0,0,0.4)', 'rgba(0,0,0,0.92)', '#000000']}
+          locations={[0, 0.55, 0.85, 1]}
+          style={styles.hideFadeOverlay}
+          pointerEvents="none"
+        />
+
+        <TouchableOpacity style={styles.menuButton} onPress={toggleSidebar} activeOpacity={0.7}>
+          <Menu color="rgba(255,255,255,0.8)" size={22} />
+        </TouchableOpacity>
+
+        <View style={styles.hideBottomStack} pointerEvents="box-none">
+          <View style={styles.poweredByWrap}>
+            <Text style={styles.poweredByText}>Powered by <Text style={[styles.poweredByAccent, { color: ac }]}>EA Mobile Connect</Text></Text>
+          </View>
+
+          {primaryEA ? (
+            <View style={[styles.neonWrap, !isNeon && { padding: 0 }, isPill && { alignSelf: 'center' as any }, (isLiquid || isMinimal) && Platform.OS === 'web' && { boxShadow: '0 0 4px rgba(' + a + ',0.7), 0 0 10px rgba(' + a + ',0.4), 0 0 25px rgba(' + a + ',0.2)', borderRadius: shapeR + 2 } as any]}>
+              <View style={[styles.liquidInner, !isNeon && { borderRadius: shapeR, borderWidth: isCmd ? 2 : isLiquid ? 1.5 : 0.5, borderColor: isCmd ? cmdRed : isLiquid ? 'rgba(' + a + ', 0.4)' : 'rgba(255,255,255,0.12)', backgroundColor: 'rgba(0,0,0,0.55)' }, Platform.OS === 'web' && { boxShadow: '0 0 10px rgba(' + a + ',0.35), 0 0 24px rgba(' + a + ',0.18)', backdropFilter: 'blur(20px)', WebkitBackdropFilter: 'blur(20px)' } as any, { overflow: 'hidden' }]}>
+                <View style={styles.bottomActions}>
+                  <TouchableOpacity testID="action-quotes" style={[styles.actionButton, styles.secondaryButton]} onPress={handleQuotes}>
+                    <View style={styles.buttonIconContainer}>
+                      <TrendingUp color={cc} size={18} />
+                    </View>
+                    <Text style={[styles.secondaryButtonText, { color: cc }]}>QUOTES</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity testID="action-start" style={[styles.actionButton, styles.tradeButton, isBotActive && styles.tradeButtonActive]} onPress={() => { try { setBotActive(!isBotActive); } catch (e) { console.error(e); } }}>
+                    <View style={[styles.tradeIconOuter, isPill && { width: 72, height: 72, borderRadius: 36 }]}>
+                      <View style={[styles.tradeIconInner, isPill && { width: 64, height: 64, borderRadius: 32 }]}>
+                        {isBotActive ? <Square color={cc} size={20} fill={cc} /> : <Play color={cc} size={22} fill={cc} />}
+                      </View>
+                    </View>
+                    <Text style={[styles.tradeButtonText, isBotActive && styles.tradeButtonTextActive, { color: cc }]}>{isBotActive ? 'STOP' : 'TRADE'}</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity testID="action-remove" style={[styles.actionButton, styles.removeButton]} onPress={handleRemoveActiveBot}>
+                    <View style={styles.buttonIconContainer}>
+                      <Trash2 color={cc} size={18} />
+                    </View>
+                    <Text style={[styles.removeButtonText, { color: cc }]}>REMOVE</Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+            </View>
+          ) : (
+            <TouchableOpacity style={[styles.neonWrap, { padding: 0, borderColor: ac, borderWidth: 1.5, backgroundColor: 'rgba(0,0,0,0.55)', paddingVertical: 14, paddingHorizontal: 20, flexDirection: 'row', gap: 14, alignItems: 'center' }, Platform.OS === 'web' && { boxShadow: '0 0 10px rgba(' + a + ',0.35), 0 0 24px rgba(' + a + ',0.18)' } as any]} onPress={handleAddNewEA} activeOpacity={0.8}>
+              <Plus color={ac} size={22} />
+              <View>
+                <Text style={[styles.addEATitle, { color: ac }]}>ADD A NEW EA</Text>
+                <Text style={[styles.addEASubtitle, { color: 'rgba(255,255,255,0.5)' }]}>HAVE A VALID LICENSE KEY</Text>
+              </View>
+            </TouchableOpacity>
+          )}
+        </View>
+
+        {showRemoveWarning && (
+          <View style={styles.modalOverlay}>
+            <View style={[styles.modalCard, Platform.OS === 'web' && { background: 'radial-gradient(ellipse 120% 50% at 20% 20%, rgba(255,255,255,0.15) 0%, transparent 70%), linear-gradient(180deg, rgba(44,44,46,0.85) 0%, rgba(28,28,30,0.95) 100%)', backdropFilter: 'blur(80px) saturate(200%)', WebkitBackdropFilter: 'blur(80px) saturate(200%)', boxShadow: 'inset 0 0.5px 0 rgba(255,255,255,0.25), 0 24px 80px rgba(0,0,0,0.6), 0 0 0 0.5px rgba(255,255,255,0.08)' }]}>
+              <Text style={styles.modalTitle}>Remove EA</Text>
+              <Text style={styles.modalMessage}>Are you sure you want to remove {primaryEA?.name || 'this EA'}? This action cannot be undone.</Text>
+              <View style={styles.modalActions}>
+                <TouchableOpacity style={styles.modalCancel} onPress={() => setShowRemoveWarning(false)}>
+                  <Text style={styles.modalCancelText}>Cancel</Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={[styles.modalConfirm, { backgroundColor: 'rgba(220, 38, 38, 0.8)' }]} onPress={confirmRemoveBot}>
+                  <Text style={styles.modalConfirmText}>Remove</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          </View>
+        )}
+      </SafeAreaView>
     );
   }
 
@@ -494,6 +584,41 @@ export default function HomeScreen() {
 const { width } = Dimensions.get('window');
 
 const styles = StyleSheet.create({
+  /* ========== HIDE-HERO LAYOUT ========== */
+  hideBackdropImage: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    width: '100%',
+    height: '100%',
+  },
+  hideBackdropFallback: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  hideFadeOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+  },
+  hideBottomStack: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    bottom: 0,
+    paddingHorizontal: 16,
+    paddingBottom: 32,
+    gap: 10,
+  },
   /* ========== SPLASH ========== */
   splashContainer: {
     flex: 1,
