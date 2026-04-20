@@ -2,7 +2,6 @@ import React, { useState, useMemo, useCallback, useEffect, useRef } from 'react'
 import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Image, ImageBackground, Platform, Dimensions, SafeAreaView, Animated, RefreshControl } from 'react-native';
 import { Play, Square, TrendingUp, Trash2, Plus, Menu, BarChart3 } from 'lucide-react-native';
 import { router } from 'expo-router';
-import { LinearGradient } from 'expo-linear-gradient';
 import { RobotLogo } from '@/components/robot-logo';
 import { PageBackground } from '@/components/page-background';
 
@@ -11,11 +10,15 @@ import { useTheme } from '@/providers/theme-provider';
 import { useSidebar } from '@/providers/sidebar-provider';
 import type { EA } from '@/providers/app-provider';
 
-const webGlow = (color: string, intense?: boolean) => Platform.OS === 'web' ? ({
-  boxShadow: intense
-    ? `0 0 12px 3px ${color}99, 0 0 32px 8px ${color}40`
-    : `0 0 9px 2px ${color}99, 0 0 24px 6px ${color}40`,
-} as any) : {};
+const hexToRgbString = (hex: string): string => {
+  const clean = hex.replace('#', '');
+  if (clean.length !== 6) return '0, 191, 255';
+  const r = parseInt(clean.slice(0, 2), 16);
+  const g = parseInt(clean.slice(2, 4), 16);
+  const b = parseInt(clean.slice(4, 6), 16);
+  if (isNaN(r) || isNaN(g) || isNaN(b)) return '0, 191, 255';
+  return `${r}, ${g}, ${b}`;
+};
 
 export default function HomeScreen() {
   const { eas, isFirstTime, setIsFirstTime, removeEA, isBotActive, setBotActive, setActiveEA, user, heroHidden, glowColor } = useApp();
@@ -34,8 +37,9 @@ export default function HomeScreen() {
   const shapeRAdd = effShape === 'superpill' ? 40 : effShape === 'pill' ? 32 : 22;
   const shapePadH = effShape === 'superpill' ? 24 : effShape === 'pill' ? 20 : 16;
   const shapeWidth = isPill ? '92%' as any : '100%' as any;
-  const cmdRed = theme.accent;
-  const cmdRedRgb = theme.accentRgb;
+  const glowRgb = hexToRgbString(glowColor);
+  const cmdRed = glowColor;
+  const cmdRedRgb = glowRgb;
 
   // Spinning neon border animations
   const cardSpin = useRef(new Animated.Value(0)).current;
@@ -71,9 +75,9 @@ export default function HomeScreen() {
     inputRange: [0, 1],
     outputRange: ['0deg', '360deg'],
   });
-  const a = theme.accentRgb;
-  const ac = theme.accent;
-  const ag = theme.accentGlow;
+  const a = glowRgb;
+  const ac = glowColor;
+  const ag = glowColor;
   // Commander overrides accent colors
   const ca = isCmd ? cmdRedRgb : a;
   const cc = isCmd ? cmdRed : ac;
@@ -230,109 +234,6 @@ export default function HomeScreen() {
     );
   }
 
-  if (heroHidden && !isMech) {
-    const minWidth = Dimensions.get('window').width;
-    return (
-      <SafeAreaView style={styles.container}>
-        <PageBackground eaImage={primaryEAImage} />
-        <TouchableOpacity style={styles.menuButton} onPress={toggleSidebar} activeOpacity={0.7}>
-          <Menu color="rgba(255,255,255,0.8)" size={22} />
-        </TouchableOpacity>
-        <View style={styles.minimalRoot}>
-          <View style={styles.minimalBackdrop} pointerEvents="none">
-            <RobotLogo size={Math.min(minWidth * 0.9, 440)} />
-          </View>
-          <View style={styles.minimalBottom} pointerEvents="box-none">
-            <LinearGradient
-              colors={['rgba(0,0,0,0)', 'rgba(0,0,0,0.55)', 'rgba(0,0,0,0.92)']}
-              style={styles.minimalFadeTop}
-              start={{ x: 0.5, y: 0 }}
-              end={{ x: 0.5, y: 1 }}
-              pointerEvents="none"
-            />
-            <View style={[
-              styles.minimalBrand,
-              { borderColor: glowColor + '4D' },
-              webGlow(glowColor),
-            ]}>
-              <Text style={[styles.minimalBrandText, { color: glowColor, textShadowColor: glowColor + '80' }]}>
-                POWERED BY EA MOBILE CONNECT
-              </Text>
-              <View style={[styles.minimalBrandLine, { backgroundColor: glowColor + '55' }]} />
-            </View>
-            <LinearGradient
-              colors={['rgba(0,0,0,0)', 'rgba(0,0,0,0.7)', '#000000']}
-              style={styles.minimalFadeBottom}
-              start={{ x: 0.5, y: 0 }}
-              end={{ x: 0.5, y: 1 }}
-              pointerEvents="none"
-            />
-            <View style={styles.minimalPanelWrap}>
-              {primaryEA ? (
-                <View style={[styles.minimalTradingPanel, { borderColor: glowColor + '55' }, webGlow(glowColor, true)]}>
-                  <View style={styles.bottomActions}>
-                    <TouchableOpacity testID="action-quotes-mini" style={[styles.actionButton, styles.secondaryButton]} onPress={handleQuotes}>
-                      <View style={styles.buttonIconContainer}>
-                        <TrendingUp color={glowColor} size={18} />
-                      </View>
-                      <Text style={[styles.secondaryButtonText, { color: glowColor }]}>QUOTES</Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity testID="action-start-mini" style={[styles.actionButton, styles.tradeButton, isBotActive && styles.tradeButtonActive]} onPress={() => { try { setBotActive(!isBotActive); } catch (e) { console.error(e); } }}>
-                      <View style={[styles.tradeIconOuter, { width: 72, height: 72, borderRadius: 36 }]}>
-                        <View style={[styles.tradeIconInner, { width: 64, height: 64, borderRadius: 32, borderColor: glowColor + '88' }]}>
-                          {isBotActive
-                            ? <Square color={glowColor} size={20} fill={glowColor} />
-                            : <Play color={glowColor} size={22} fill={glowColor} />
-                          }
-                        </View>
-                      </View>
-                      <Text style={[styles.tradeButtonText, { color: glowColor }]}>{isBotActive ? 'STOP' : 'TRADE'}</Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity testID="action-remove-mini" style={[styles.actionButton, styles.removeButton]} onPress={handleRemoveActiveBot}>
-                      <View style={styles.buttonIconContainer}>
-                        <Trash2 color={glowColor} size={18} />
-                      </View>
-                      <Text style={[styles.removeButtonText, { color: glowColor }]}>REMOVE</Text>
-                    </TouchableOpacity>
-                  </View>
-                </View>
-              ) : (
-                <TouchableOpacity
-                  style={[styles.minimalAddEA, { borderColor: glowColor + '99' }, webGlow(glowColor, true)]}
-                  onPress={handleAddNewEA}
-                  activeOpacity={0.85}
-                >
-                  <Plus color={glowColor} size={22} />
-                  <View>
-                    <Text style={[styles.addEATitle, { color: glowColor, textShadowColor: glowColor + '80' }]}>ADD A NEW EA</Text>
-                    <Text style={[styles.addEASubtitle, { color: glowColor + '99' }]}>HAVE A VALID LICENSE KEY</Text>
-                  </View>
-                </TouchableOpacity>
-              )}
-            </View>
-          </View>
-        </View>
-
-        {showRemoveWarning && (
-          <View style={styles.modalOverlay}>
-            <View style={[styles.modalCard, Platform.OS === 'web' && { background: 'radial-gradient(ellipse 120% 50% at 20% 20%, rgba(255,255,255,0.15) 0%, transparent 70%), linear-gradient(180deg, rgba(44,44,46,0.85) 0%, rgba(28,28,30,0.95) 100%)', backdropFilter: 'blur(80px) saturate(200%)', WebkitBackdropFilter: 'blur(80px) saturate(200%)', boxShadow: 'inset 0 0.5px 0 rgba(255,255,255,0.25), 0 24px 80px rgba(0,0,0,0.6), 0 0 0 0.5px rgba(255,255,255,0.08)' }]}>
-              <Text style={styles.modalTitle}>Remove EA</Text>
-              <Text style={styles.modalMessage}>Are you sure you want to remove {primaryEA?.name || 'this EA'}? This action cannot be undone.</Text>
-              <View style={styles.modalActions}>
-                <TouchableOpacity style={styles.modalCancel} onPress={() => setShowRemoveWarning(false)}>
-                  <Text style={styles.modalCancelText}>Cancel</Text>
-                </TouchableOpacity>
-                <TouchableOpacity style={[styles.modalConfirm, { backgroundColor: 'rgba(220, 38, 38, 0.8)' }]} onPress={confirmRemoveBot}>
-                  <Text style={styles.modalConfirmText}>Remove</Text>
-                </TouchableOpacity>
-              </View>
-            </View>
-          </View>
-        )}
-      </SafeAreaView>
-    );
-  }
-
   return (
     <SafeAreaView style={[styles.container, Platform.OS === 'web' && { backgroundImage: isNeon ? 'linear-gradient(135deg, rgba(' + a + ', 0.7) 0%, rgba(' + a + ', 0.3) 25%, rgba(0,0,0,0.85) 55%, #000 100%)' : isLiquid ? 'linear-gradient(160deg, #1a1a1e 0%, #111113 40%, #0a0a0c 100%)' : isCmd ? 'none' : 'none' }]}>
       {/* Background — robot image or video */}
@@ -421,7 +322,7 @@ export default function HomeScreen() {
         )}
 
         {/* ========== STANDARD LAYOUT (all other themes) ========== */}
-        {!isMech && primaryEA && (
+        {!isMech && primaryEA && !heroHidden && (
           <View style={styles.mainEAContainer}>
 
             {/* ========== 1. HERO — CIRCLE or SQUARE ========== */}
@@ -593,91 +494,6 @@ export default function HomeScreen() {
 const { width } = Dimensions.get('window');
 
 const styles = StyleSheet.create({
-  /* ========== MINIMAL HERO-HIDDEN LAYOUT ========== */
-  minimalRoot: {
-    flex: 1,
-    position: 'relative',
-  },
-  minimalBackdrop: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingBottom: 220,
-  },
-  minimalBottom: {
-    position: 'absolute',
-    left: 0,
-    right: 0,
-    bottom: 0,
-    paddingHorizontal: 16,
-    paddingBottom: 32,
-    alignItems: 'center',
-  },
-  minimalFadeTop: {
-    position: 'absolute',
-    top: -160,
-    left: 0,
-    right: 0,
-    height: 200,
-  },
-  minimalBrand: {
-    paddingVertical: 8,
-    paddingHorizontal: 18,
-    borderRadius: 22,
-    borderWidth: 1.5,
-    backgroundColor: 'rgba(0,0,0,0.55)',
-    alignItems: 'center',
-    marginBottom: 12,
-    zIndex: 2,
-  },
-  minimalBrandText: {
-    fontSize: 11,
-    fontWeight: '800',
-    letterSpacing: 2,
-    textShadowOffset: { width: 0, height: 0 },
-    textShadowRadius: 10,
-  },
-  minimalBrandLine: {
-    width: 36,
-    height: 2,
-    borderRadius: 1,
-    marginTop: 6,
-  },
-  minimalFadeBottom: {
-    position: 'absolute',
-    left: 0,
-    right: 0,
-    top: 60,
-    height: 140,
-    zIndex: 1,
-  },
-  minimalPanelWrap: {
-    width: '100%',
-    maxWidth: 520,
-    alignSelf: 'center',
-    zIndex: 3,
-  },
-  minimalTradingPanel: {
-    borderRadius: 26,
-    borderWidth: 1.75,
-    backgroundColor: 'rgba(0,0,0,0.55)',
-    paddingVertical: 12,
-    paddingHorizontal: 10,
-  },
-  minimalAddEA: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 14,
-    paddingVertical: 14,
-    paddingHorizontal: 20,
-    borderRadius: 22,
-    borderWidth: 1.75,
-    backgroundColor: 'rgba(0,0,0,0.55)',
-  },
   /* ========== SPLASH ========== */
   splashContainer: {
     flex: 1,
