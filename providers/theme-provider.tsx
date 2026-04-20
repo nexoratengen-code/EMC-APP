@@ -2,7 +2,7 @@ import createContextHook from '@nkzw/create-context-hook';
 import { useState, useEffect, useCallback } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
-export type ThemeName = 'red' | 'blue' | 'green' | 'purple' | 'orange' | 'cyan';
+export type ThemeName = 'pink' | 'gold' | 'silver' | 'white' | 'teal' | 'lime' | 'magenta' | 'crimson' | 'violet' | 'amber';
 export type GlassMode = 'neon' | 'minimal' | 'liquid' | 'commander' | 'mech';
 export type FontFamily = 'system' | 'mono' | 'rounded' | 'condensed' | 'serif' | 'grotesk' | 'jetbrains' | 'outfit' | 'sora' | 'tight';
 export type HeroStyle = 'square' | 'circle';
@@ -35,12 +35,16 @@ export interface ThemeColors {
 }
 
 const THEMES: Record<ThemeName, ThemeColors> = {
-  red: { accent: '#8B5CF6', accentRgb: '139, 92, 246', accentLight: '#C4B5FD', accentGlow: '#8B5CF6', gradientStart: 'rgba(139, 92, 246,', textMuted: 'rgba(196, 181, 253, 0.6)' },
-  blue: { accent: '#1A8FFF', accentRgb: '26, 143, 255', accentLight: '#B3D9FF', accentGlow: '#1A8FFF', gradientStart: 'rgba(26, 143, 255,', textMuted: 'rgba(179, 217, 255, 0.6)' },
-  green: { accent: '#1AFF5E', accentRgb: '26, 255, 94', accentLight: '#B3FFD0', accentGlow: '#1AFF5E', gradientStart: 'rgba(26, 255, 94,', textMuted: 'rgba(179, 255, 208, 0.6)' },
-  purple: { accent: '#8B5CF6', accentRgb: '139, 92, 246', accentLight: '#C4B5FD', accentGlow: '#8B5CF6', gradientStart: 'rgba(139, 92, 246,', textMuted: 'rgba(196, 181, 253, 0.6)' },
-  orange: { accent: '#FF8C1A', accentRgb: '255, 140, 26', accentLight: '#FFD1A3', accentGlow: '#FF8C1A', gradientStart: 'rgba(255, 140, 26,', textMuted: 'rgba(255, 209, 163, 0.6)' },
-  cyan: { accent: '#06D6E0', accentRgb: '6, 214, 224', accentLight: '#A5F3FC', accentGlow: '#06D6E0', gradientStart: 'rgba(6, 214, 224,', textMuted: 'rgba(165, 243, 252, 0.6)' },
+  pink:    { accent: '#FF4DA6', accentRgb: '255, 77, 166',  accentLight: '#FFB3D9', accentGlow: '#FF4DA6', gradientStart: 'rgba(255, 77, 166,',  textMuted: 'rgba(255, 179, 217, 0.6)' },
+  gold:    { accent: '#FFD700', accentRgb: '255, 215, 0',   accentLight: '#FFEB99', accentGlow: '#FFD700', gradientStart: 'rgba(255, 215, 0,',   textMuted: 'rgba(255, 235, 153, 0.6)' },
+  silver:  { accent: '#C0C5CE', accentRgb: '192, 197, 206', accentLight: '#E5E7EB', accentGlow: '#C0C5CE', gradientStart: 'rgba(192, 197, 206,', textMuted: 'rgba(229, 231, 235, 0.6)' },
+  white:   { accent: '#FFFFFF', accentRgb: '255, 255, 255', accentLight: '#F3F4F6', accentGlow: '#FFFFFF', gradientStart: 'rgba(255, 255, 255,', textMuted: 'rgba(243, 244, 246, 0.6)' },
+  teal:    { accent: '#14B8A6', accentRgb: '20, 184, 166',  accentLight: '#99F6E4', accentGlow: '#14B8A6', gradientStart: 'rgba(20, 184, 166,',  textMuted: 'rgba(153, 246, 228, 0.6)' },
+  lime:    { accent: '#A3E635', accentRgb: '163, 230, 53',  accentLight: '#D9F99D', accentGlow: '#A3E635', gradientStart: 'rgba(163, 230, 53,',  textMuted: 'rgba(217, 249, 157, 0.6)' },
+  magenta: { accent: '#D946EF', accentRgb: '217, 70, 239',  accentLight: '#F0ABFC', accentGlow: '#D946EF', gradientStart: 'rgba(217, 70, 239,',  textMuted: 'rgba(240, 171, 252, 0.6)' },
+  crimson: { accent: '#DC143C', accentRgb: '220, 20, 60',   accentLight: '#FCA5A5', accentGlow: '#DC143C', gradientStart: 'rgba(220, 20, 60,',   textMuted: 'rgba(252, 165, 165, 0.6)' },
+  violet:  { accent: '#8B5CF6', accentRgb: '139, 92, 246',  accentLight: '#C4B5FD', accentGlow: '#8B5CF6', gradientStart: 'rgba(139, 92, 246,',  textMuted: 'rgba(196, 181, 253, 0.6)' },
+  amber:   { accent: '#F59E0B', accentRgb: '245, 158, 11',  accentLight: '#FCD34D', accentGlow: '#F59E0B', gradientStart: 'rgba(245, 158, 11,',  textMuted: 'rgba(252, 211, 77, 0.6)' },
 };
 
 const THEME_STORAGE_KEY = 'tradeport_theme';
@@ -64,7 +68,7 @@ export interface ThemeState {
 }
 
 export const [ThemeProvider, useTheme] = createContextHook<ThemeState>(() => {
-  const [themeName, setThemeNameState] = useState<ThemeName>('purple');
+  const [themeName, setThemeNameState] = useState<ThemeName>('violet');
   const [glassMode, setGlassModeState] = useState<GlassMode>('commander');
   const [fontFamily, setFontFamilyState] = useState<FontFamily>('system');
   const [heroStyle, setHeroStyleState] = useState<HeroStyle>('circle');

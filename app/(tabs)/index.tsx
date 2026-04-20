@@ -713,7 +713,7 @@ const styles = StyleSheet.create({
   },
   hero: {
     width: '100%',
-    height: 500,
+    aspectRatio: 9 / 16,
     borderRadius: 30,
     overflow: 'hidden',
     shadowColor: '#000000',
@@ -727,7 +727,7 @@ const styles = StyleSheet.create({
   },
   heroFallback: {
     width: '100%',
-    height: 500,
+    aspectRatio: 9 / 16,
     borderRadius: 30,
     backgroundColor: 'rgba(255, 255, 255, 0.06)',
     alignItems: 'center',

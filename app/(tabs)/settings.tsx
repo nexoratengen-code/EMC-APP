@@ -2,17 +2,22 @@ import React from 'react';
 import { View, Text, StyleSheet, SafeAreaView, Platform, TouchableOpacity, ScrollView } from 'react-native';
 import { useTheme, ThemeName, FontFamily, HeroStyle, TextCase, BgType, CardBgMode, CardShape } from '@/providers/theme-provider';
 import { PageBackground } from '@/components/page-background';
+import { AnimatedButton } from '@/components/animated-button';
 import { useApp } from '@/providers/app-provider';
 import { useSidebar } from '@/providers/sidebar-provider';
 import { Menu } from 'lucide-react-native';
 
 const THEME_OPTIONS: { name: ThemeName; label: string; preview: string }[] = [
-  { name: 'red', label: 'Red', preview: '#8B5CF6' },
-  { name: 'blue', label: 'Blue', preview: '#1A8FFF' },
-  { name: 'green', label: 'Green', preview: '#1AFF5E' },
-  { name: 'purple', label: 'Purple', preview: '#8B5CF6' },
-  { name: 'orange', label: 'Orange', preview: '#FF8C1A' },
-  { name: 'cyan', label: 'Cyan', preview: '#06D6E0' },
+  { name: 'pink',    label: 'Pink',    preview: '#FF4DA6' },
+  { name: 'gold',    label: 'Gold',    preview: '#FFD700' },
+  { name: 'silver',  label: 'Silver',  preview: '#C0C5CE' },
+  { name: 'white',   label: 'White',   preview: '#FFFFFF' },
+  { name: 'teal',    label: 'Teal',    preview: '#14B8A6' },
+  { name: 'lime',    label: 'Lime',    preview: '#A3E635' },
+  { name: 'magenta', label: 'Magenta', preview: '#D946EF' },
+  { name: 'crimson', label: 'Crimson', preview: '#DC143C' },
+  { name: 'violet',  label: 'Violet',  preview: '#8B5CF6' },
+  { name: 'amber',   label: 'Amber',   preview: '#F59E0B' },
 ];
 
 export default function SettingsScreen() {
@@ -46,15 +51,18 @@ export default function SettingsScreen() {
           {THEME_OPTIONS.map((opt) => {
             const isActive = themeName === opt.name;
             return (
-              <TouchableOpacity
+              <AnimatedButton
                 key={opt.name}
+                selected={isActive}
+                accent={opt.preview}
+                accentRgb={opt.preview}
+                fillOnSelect={false}
+                pressScale={0.94}
+                borderRadius={16}
                 style={[
                   styles.themeCard,
                   { borderColor: isActive ? opt.preview : 'rgba(255, 255, 255, 0.08)' },
-                  isActive && { shadowColor: opt.preview, shadowOpacity: 0.5, shadowRadius: 12 },
-                  isActive && Platform.OS === 'web' && { boxShadow: '0 0 14px ' + opt.preview + '55, 0 0 28px ' + opt.preview + '22' },
                 ]}
-                activeOpacity={0.7}
                 onPress={() => setThemeName(opt.name)}
               >
                 <View style={[styles.previewSwatch, { backgroundColor: opt.preview + '20', borderColor: opt.preview + '44' }]}>
@@ -64,7 +72,7 @@ export default function SettingsScreen() {
                 {isActive && (
                   <View style={[styles.activeDot, { backgroundColor: opt.preview }]} />
                 )}
-              </TouchableOpacity>
+              </AnimatedButton>
             );
           })}
         </View>
@@ -78,14 +86,16 @@ export default function SettingsScreen() {
             {(['neon', 'minimal', 'liquid', 'commander', 'mech'] as const).map((m) => {
               const active = glassMode === m;
               return (
-                <TouchableOpacity
+                <AnimatedButton
                   key={m}
-                  style={[styles.glassSeg, active && styles.glassSegActive, active && { borderColor: theme.accent + '55' }, active && Platform.OS === 'web' && { boxShadow: '0 0 10px ' + theme.accent + '22' }]}
+                  selected={active}
+                  accent={theme.accent}
+                  accentRgb={theme.accentRgb}
+                  style={styles.glassSeg}
                   onPress={() => setGlassMode(m)}
-                  activeOpacity={0.7}
                 >
                   <Text style={[styles.glassSegText, active && { color: theme.accent }]}>{m === 'neon' ? 'Neon' : m === 'minimal' ? 'Minimal' : m === 'liquid' ? 'Liquid' : m === 'mech' ? 'Mech' : 'Commander'}</Text>
-                </TouchableOpacity>
+                </AnimatedButton>
               );
             })}
           </View>
@@ -98,14 +108,16 @@ export default function SettingsScreen() {
               const active = fontFamily === f;
               const labels: Record<FontFamily, string> = { system: 'System', mono: 'Mono', rounded: 'Rounded', condensed: 'Condensed', serif: 'Serif', grotesk: 'Grotesk', jetbrains: 'JetBrains', outfit: 'Outfit', sora: 'Sora', tight: 'Tight' };
               return (
-                <TouchableOpacity
+                <AnimatedButton
                   key={f}
-                  style={[styles.glassSeg, active && styles.glassSegActive, active && { borderColor: theme.accent + '55' }]}
+                  selected={active}
+                  accent={theme.accent}
+                  accentRgb={theme.accentRgb}
+                  style={styles.glassSeg}
                   onPress={() => setFontFamily(f)}
-                  activeOpacity={0.7}
                 >
                   <Text style={[styles.glassSegText, active && { color: theme.accent }]}>{labels[f]}</Text>
-                </TouchableOpacity>
+                </AnimatedButton>
               );
             })}
           </View>
@@ -117,9 +129,9 @@ export default function SettingsScreen() {
             {(['square', 'circle'] as HeroStyle[]).map((h) => {
               const active = heroStyle === h;
               return (
-                <TouchableOpacity key={h} style={[styles.glassSeg, active && styles.glassSegActive, active && { borderColor: theme.accent + '55' }]} onPress={() => setHeroStyle(h)} activeOpacity={0.7}>
+                <AnimatedButton key={h} selected={active} accent={theme.accent} accentRgb={theme.accentRgb} style={styles.glassSeg} onPress={() => setHeroStyle(h)}>
                   <Text style={[styles.glassSegText, active && { color: theme.accent }]}>{h === 'square' ? 'Square' : 'Circle'}</Text>
-                </TouchableOpacity>
+                </AnimatedButton>
               );
             })}
           </View>
@@ -132,9 +144,9 @@ export default function SettingsScreen() {
               const active = cardBgMode === c;
               const labels: Record<CardBgMode, string> = { thumbnail: 'Thumbnail', fullcover: 'Full Cover' };
               return (
-                <TouchableOpacity key={c} style={[styles.glassSeg, active && styles.glassSegActive, active && { borderColor: theme.accent + '55' }]} onPress={() => setCardBgMode(c)} activeOpacity={0.7}>
+                <AnimatedButton key={c} selected={active} accent={theme.accent} accentRgb={theme.accentRgb} style={styles.glassSeg} onPress={() => setCardBgMode(c)}>
                   <Text style={[styles.glassSegText, active && { color: theme.accent }]}>{labels[c]}</Text>
-                </TouchableOpacity>
+                </AnimatedButton>
               );
             })}
           </View>
@@ -147,9 +159,9 @@ export default function SettingsScreen() {
               const active = cardShape === s;
               const labels: Record<CardShape, string> = { rounded: 'Rounded', pill: 'Pill', superpill: 'Super Pill' };
               return (
-                <TouchableOpacity key={s} style={[styles.glassSeg, active && styles.glassSegActive, active && { borderColor: theme.accent + '55' }]} onPress={() => setCardShape(s)} activeOpacity={0.7}>
+                <AnimatedButton key={s} selected={active} accent={theme.accent} accentRgb={theme.accentRgb} style={styles.glassSeg} onPress={() => setCardShape(s)}>
                   <Text style={[styles.glassSegText, active && { color: theme.accent }]}>{labels[s]}</Text>
-                </TouchableOpacity>
+                </AnimatedButton>
               );
             })}
           </View>
@@ -162,9 +174,9 @@ export default function SettingsScreen() {
               const active = textCase === t;
               const labels: Record<TextCase, string> = { normal: 'Normal', upper: 'UPPER', lower: 'lower', capitalize: 'Capitalize' };
               return (
-                <TouchableOpacity key={t} style={[styles.glassSeg, active && styles.glassSegActive, active && { borderColor: theme.accent + '55' }]} onPress={() => setTextCase(t)} activeOpacity={0.7}>
+                <AnimatedButton key={t} selected={active} accent={theme.accent} accentRgb={theme.accentRgb} style={styles.glassSeg} onPress={() => setTextCase(t)}>
                   <Text style={[styles.glassSegText, active && { color: theme.accent }]}>{labels[t]}</Text>
-                </TouchableOpacity>
+                </AnimatedButton>
               );
             })}
           </View>
@@ -180,9 +192,9 @@ export default function SettingsScreen() {
               const active = bgType === b;
               const labels: Record<string, string> = { robot: '🤖 Robot', video1: '🎬 V1', video2: '🎬 V2', video3: '🎬 V3', video4: '🎬 V4', off: '⬛ Off' };
               return (
-                <TouchableOpacity key={b} style={[styles.glassSeg, active && styles.glassSegActive, active && { borderColor: theme.accent + '55' }]} onPress={() => setBgType(b)} activeOpacity={0.7}>
+                <AnimatedButton key={b} selected={active} accent={theme.accent} accentRgb={theme.accentRgb} style={styles.glassSeg} onPress={() => setBgType(b)}>
                   <Text style={[styles.glassSegText, active && { color: theme.accent }]}>{labels[b]}</Text>
-                </TouchableOpacity>
+                </AnimatedButton>
               );
             })}
           </View>
