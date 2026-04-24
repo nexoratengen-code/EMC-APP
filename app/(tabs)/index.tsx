@@ -2,7 +2,6 @@ import React, { useState, useMemo, useCallback, useEffect, useRef } from 'react'
 import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Image, ImageBackground, Platform, Dimensions, SafeAreaView, Animated, RefreshControl } from 'react-native';
 import { Play, Square, TrendingUp, Trash2, Plus, Menu, BarChart3 } from 'lucide-react-native';
 import { router } from 'expo-router';
-import { LinearGradient } from 'expo-linear-gradient';
 import { RobotLogo } from '@/components/robot-logo';
 import { PageBackground } from '@/components/page-background';
 import { AnimatedButton } from '@/components/animated-button';
@@ -250,13 +249,6 @@ export default function HomeScreen() {
             <RobotLogo size={Math.min(width * 0.7, 320)} />
           </View>
         )}
-
-        <LinearGradient
-          colors={['rgba(0,0,0,0)', 'rgba(0,0,0,0.4)', 'rgba(0,0,0,0.92)', '#000000']}
-          locations={[0, 0.55, 0.85, 1]}
-          style={styles.hideFadeOverlay}
-          pointerEvents="none"
-        />
 
         <TouchableOpacity style={styles.menuButton} onPress={toggleSidebar} activeOpacity={0.7}>
           <Menu color="rgba(255,255,255,0.8)" size={22} />
@@ -603,13 +595,6 @@ const styles = StyleSheet.create({
     bottom: 0,
     alignItems: 'center',
     justifyContent: 'center',
-  },
-  hideFadeOverlay: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
   },
   hideBottomStack: {
     position: 'absolute',
