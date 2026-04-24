@@ -277,7 +277,7 @@ export default function HomeScreen() {
                     </View>
                     <Text style={[styles.secondaryButtonText, { color: cc }]}>QUOTES</Text>
                   </AnimatedButton>
-                  <AnimatedButton testID="action-start" accent={cc} accentRgb={glowRgb} glow={false} fillOnSelect={false} style={[styles.actionButton, isBotActive && styles.tradeButtonActive]} onPress={() => { try { setBotActive(!isBotActive); } catch (e) { console.error(e); } }}>
+                  <AnimatedButton testID="action-start" accent={cc} accentRgb={glowRgb} glow={false} fillOnSelect={false} style={styles.actionButton} onPress={() => { try { setBotActive(!isBotActive); } catch (e) { console.error(e); } }}>
                     <View style={[styles.tradeIconOuter, isPill && { width: 72, height: 72, borderRadius: 36 }]}>
                       <View style={[styles.tradeIconInner, isPill && { width: 64, height: 64, borderRadius: 32 }]}>
                         {isBotActive ? <Square color={cc} size={20} fill={cc} /> : <Play color={cc} size={22} fill={cc} />}
@@ -496,7 +496,7 @@ export default function HomeScreen() {
                     </View>
                     <Text style={[styles.secondaryButtonText, isCmd && { color: cmdRed }]}>QUOTES</Text>
                   </AnimatedButton>
-                  <AnimatedButton testID="action-start" accent={cc} accentRgb={glowRgb} glow={false} fillOnSelect={false} style={[styles.actionButton, isBotActive && styles.tradeButtonActive]} onPress={() => { try { setBotActive(!isBotActive); } catch (e) { console.error(e); } }}>
+                  <AnimatedButton testID="action-start" accent={cc} accentRgb={glowRgb} glow={false} fillOnSelect={false} style={styles.actionButton} onPress={() => { try { setBotActive(!isBotActive); } catch (e) { console.error(e); } }}>
                     <View style={[styles.tradeIconOuter, isPill && { width: 72, height: 72, borderRadius: 36 }]}>
                       <Animated.View style={[styles.tradeIconSpinner, { transform: [{ rotate: tradeSpinDeg }] }, Platform.OS === 'web' && { backgroundImage: 'conic-gradient(from 0deg, transparent 0deg, ' + cc + ' 60deg, rgba(' + ca + ', 0.5) 120deg, transparent 180deg, transparent 240deg, ' + cc + ' 300deg, transparent 360deg)' }]} />
                       <Animated.View style={[styles.tradeIconGlow, { transform: [{ rotate: tradeSpinDeg }] }, Platform.OS === 'web' && { backgroundImage: 'conic-gradient(from 0deg, transparent 0deg, rgba(' + ca + ', 0.5) 60deg, transparent 180deg, rgba(' + ca + ', 0.5) 300deg, transparent 360deg)' }]} />
