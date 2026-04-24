@@ -5,6 +5,7 @@ import { router } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
 import { RobotLogo } from '@/components/robot-logo';
 import { PageBackground } from '@/components/page-background';
+import { AnimatedButton } from '@/components/animated-button';
 
 import { useApp } from '@/providers/app-provider';
 import { useTheme } from '@/providers/theme-provider';
@@ -268,28 +269,28 @@ export default function HomeScreen() {
 
           {primaryEA ? (
             <View style={[styles.neonWrap, !isNeon && { padding: 0 }, isPill && { alignSelf: 'center' as any }, (isLiquid || isMinimal) && Platform.OS === 'web' && { boxShadow: '0 0 4px rgba(' + a + ',0.7), 0 0 10px rgba(' + a + ',0.4), 0 0 25px rgba(' + a + ',0.2)', borderRadius: shapeR + 2 } as any]}>
-              <View style={[styles.liquidInner, !isNeon && { borderRadius: shapeR, borderWidth: isCmd ? 2 : isLiquid ? 1.5 : 0.5, borderColor: isCmd ? cmdRed : isLiquid ? 'rgba(' + a + ', 0.4)' : 'rgba(255,255,255,0.12)', backgroundColor: 'rgba(0,0,0,0.55)' }, Platform.OS === 'web' && { boxShadow: '0 0 10px rgba(' + a + ',0.35), 0 0 24px rgba(' + a + ',0.18)', backdropFilter: 'blur(20px)', WebkitBackdropFilter: 'blur(20px)' } as any, { overflow: 'hidden' }]}>
+              <View style={[styles.liquidInner, !isNeon && { borderRadius: shapeR, borderWidth: isCmd ? 2 : isLiquid ? 1.5 : 0.5, borderColor: isCmd ? cmdRed : isLiquid ? 'rgba(' + a + ', 0.4)' : 'rgba(255,255,255,0.12)', backgroundColor: 'rgba(10,10,12,0.72)' }, Platform.OS === 'web' && { boxShadow: '0 12px 28px rgba(0,0,0,0.6), 0 0 18px rgba(' + a + ',0.35), 0 0 32px rgba(' + a + ',0.18)', backdropFilter: 'blur(28px) saturate(160%)', WebkitBackdropFilter: 'blur(28px) saturate(160%)' } as any, { overflow: 'hidden' }]}>
                 <View style={styles.bottomActions}>
-                  <TouchableOpacity testID="action-quotes" style={[styles.actionButton, styles.secondaryButton]} onPress={handleQuotes}>
+                  <AnimatedButton testID="action-quotes" accent={cc} accentRgb={glowRgb} glow={false} fillOnSelect={false} style={styles.actionButton} onPress={handleQuotes}>
                     <View style={styles.buttonIconContainer}>
                       <TrendingUp color={cc} size={18} />
                     </View>
                     <Text style={[styles.secondaryButtonText, { color: cc }]}>QUOTES</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity testID="action-start" style={[styles.actionButton, styles.tradeButton, isBotActive && styles.tradeButtonActive]} onPress={() => { try { setBotActive(!isBotActive); } catch (e) { console.error(e); } }}>
+                  </AnimatedButton>
+                  <AnimatedButton testID="action-start" accent={cc} accentRgb={glowRgb} glow={false} fillOnSelect={false} style={[styles.actionButton, isBotActive && styles.tradeButtonActive]} onPress={() => { try { setBotActive(!isBotActive); } catch (e) { console.error(e); } }}>
                     <View style={[styles.tradeIconOuter, isPill && { width: 72, height: 72, borderRadius: 36 }]}>
                       <View style={[styles.tradeIconInner, isPill && { width: 64, height: 64, borderRadius: 32 }]}>
                         {isBotActive ? <Square color={cc} size={20} fill={cc} /> : <Play color={cc} size={22} fill={cc} />}
                       </View>
                     </View>
                     <Text style={[styles.tradeButtonText, isBotActive && styles.tradeButtonTextActive, { color: cc }]}>{isBotActive ? 'STOP' : 'TRADE'}</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity testID="action-remove" style={[styles.actionButton, styles.removeButton]} onPress={handleRemoveActiveBot}>
+                  </AnimatedButton>
+                  <AnimatedButton testID="action-remove" accent={cc} accentRgb={glowRgb} glow={false} fillOnSelect={false} style={styles.actionButton} onPress={handleRemoveActiveBot}>
                     <View style={styles.buttonIconContainer}>
                       <Trash2 color={cc} size={18} />
                     </View>
                     <Text style={[styles.removeButtonText, { color: cc }]}>REMOVE</Text>
-                  </TouchableOpacity>
+                  </AnimatedButton>
                 </View>
               </View>
             </View>
@@ -489,13 +490,13 @@ export default function HomeScreen() {
                 {isNeon && <View style={[styles.refraction, Platform.OS === 'web' && { background: 'linear-gradient(180deg, rgba(255,255,255,0.18) 0%, rgba(255,255,255,0.06) 40%, transparent 100%)' }]} />}
                 {isNeon && <View style={[styles.meniscus, Platform.OS === 'web' && { background: 'radial-gradient(ellipse 60% 100% at 50% 0%, rgba(255,255,255,0.12) 0%, transparent 100%)' }]} />}
                 <View style={styles.bottomActions}>
-                  <TouchableOpacity testID="action-quotes" style={[styles.actionButton, styles.secondaryButton]} onPress={handleQuotes}>
+                  <AnimatedButton testID="action-quotes" accent={cc} accentRgb={glowRgb} glow={false} fillOnSelect={false} style={styles.actionButton} onPress={handleQuotes}>
                     <View style={styles.buttonIconContainer}>
                       <TrendingUp color={cc} size={18} />
                     </View>
                     <Text style={[styles.secondaryButtonText, isCmd && { color: cmdRed }]}>QUOTES</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity testID="action-start" style={[styles.actionButton, styles.tradeButton, isBotActive && styles.tradeButtonActive]} onPress={() => { try { setBotActive(!isBotActive); } catch (e) { console.error(e); } }}>
+                  </AnimatedButton>
+                  <AnimatedButton testID="action-start" accent={cc} accentRgb={glowRgb} glow={false} fillOnSelect={false} style={[styles.actionButton, isBotActive && styles.tradeButtonActive]} onPress={() => { try { setBotActive(!isBotActive); } catch (e) { console.error(e); } }}>
                     <View style={[styles.tradeIconOuter, isPill && { width: 72, height: 72, borderRadius: 36 }]}>
                       <Animated.View style={[styles.tradeIconSpinner, { transform: [{ rotate: tradeSpinDeg }] }, Platform.OS === 'web' && { backgroundImage: 'conic-gradient(from 0deg, transparent 0deg, ' + cc + ' 60deg, rgba(' + ca + ', 0.5) 120deg, transparent 180deg, transparent 240deg, ' + cc + ' 300deg, transparent 360deg)' }]} />
                       <Animated.View style={[styles.tradeIconGlow, { transform: [{ rotate: tradeSpinDeg }] }, Platform.OS === 'web' && { backgroundImage: 'conic-gradient(from 0deg, transparent 0deg, rgba(' + ca + ', 0.5) 60deg, transparent 180deg, rgba(' + ca + ', 0.5) 300deg, transparent 360deg)' }]} />
@@ -504,13 +505,13 @@ export default function HomeScreen() {
                       </View>
                     </View>
                     <Text style={[styles.tradeButtonText, isBotActive && styles.tradeButtonTextActive, isCmd && { color: cmdRed }]}>{isBotActive ? 'STOP' : 'TRADE'}</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity testID="action-remove" style={[styles.actionButton, styles.removeButton]} onPress={handleRemoveActiveBot}>
+                  </AnimatedButton>
+                  <AnimatedButton testID="action-remove" accent={cc} accentRgb={glowRgb} glow={false} fillOnSelect={false} style={styles.actionButton} onPress={handleRemoveActiveBot}>
                     <View style={styles.buttonIconContainer}>
                       <Trash2 color={isCmd ? cmdRed : ac} size={18} />
                     </View>
                     <Text style={[styles.removeButtonText, isCmd && { color: cmdRed }]}>REMOVE</Text>
-                  </TouchableOpacity>
+                  </AnimatedButton>
                 </View>
               </View>
             </View>
@@ -938,6 +939,11 @@ const styles = StyleSheet.create({
     padding: 2.5,
     overflow: 'hidden',
     marginBottom: 20,
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.55,
+    shadowRadius: 22,
+    elevation: 14,
   },
   neonSpinner: {
     position: 'absolute',
@@ -1062,6 +1068,12 @@ const styles = StyleSheet.create({
     gap: 6,
     minHeight: 56,
     backgroundColor: 'transparent',
+    ...(Platform.OS === 'web' && {
+      outline: 'none',
+      WebkitTapHighlightColor: 'transparent',
+      cursor: 'pointer',
+      userSelect: 'none',
+    } as any),
   },
   tradeButton: {
     backgroundColor: 'transparent',
