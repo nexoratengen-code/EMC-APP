@@ -241,8 +241,8 @@ export default function HomeScreen() {
         {primaryEAImage ? (
           <Image
             source={{ uri: primaryEAImage }}
-            style={styles.hideBackdropImage}
-            resizeMode="cover"
+            style={[styles.hideBackdropImage, Platform.OS === 'web' && ({ objectPosition: 'center top' } as any)]}
+            resizeMode="contain"
           />
         ) : (
           <View style={styles.hideBackdropFallback}>
