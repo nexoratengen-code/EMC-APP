@@ -55,6 +55,29 @@ const CASE_STORAGE_KEY = 'tradeport_text_case';
 const BG_STORAGE_KEY = 'tradeport_bg_type';
 const CARDBG_STORAGE_KEY = 'tradeport_card_bg';
 const SHAPE_STORAGE_KEY = 'tradeport_card_shape';
+const GLOW_STORAGE_KEY = 'glowColor';
+
+const hexToRgbString = (hex: string): string => {
+  const clean = hex.replace('#', '');
+  if (clean.length !== 6) return '139, 92, 246';
+  const r = parseInt(clean.slice(0, 2), 16);
+  const g = parseInt(clean.slice(2, 4), 16);
+  const b = parseInt(clean.slice(4, 6), 16);
+  if (isNaN(r) || isNaN(g) || isNaN(b)) return '139, 92, 246';
+  return `${r}, ${g}, ${b}`;
+};
+
+const buildEffectiveTheme = (base: ThemeColors, glow: string | null): ThemeColors => {
+  if (!glow) return base;
+  const rgb = hexToRgbString(glow);
+  return {
+    ...base,
+    accent: glow,
+    accentRgb: rgb,
+    accentGlow: glow,
+    gradientStart: `rgba(${rgb},`,
+  };
+};
 
 export interface ThemeState {
   themeName: ThemeName; theme: ThemeColors; setThemeName: (name: ThemeName) => void;
@@ -65,6 +88,7 @@ export interface ThemeState {
   bgType: BgType; setBgType: (b: BgType) => void;
   cardBgMode: CardBgMode; setCardBgMode: (c: CardBgMode) => void;
   cardShape: CardShape; setCardShape: (s: CardShape) => void;
+  glowColor: string; setGlowColor: (c: string) => void;
 }
 
 export const [ThemeProvider, useTheme] = createContextHook<ThemeState>(() => {
@@ -76,6 +100,7 @@ export const [ThemeProvider, useTheme] = createContextHook<ThemeState>(() => {
   const [bgType, setBgTypeState] = useState<BgType>('robot');
   const [cardBgMode, setCardBgModeState] = useState<CardBgMode>('thumbnail');
   const [cardShape, setCardShapeState] = useState<CardShape>('rounded');
+  const [glowColor, setGlowColorState] = useState<string>('#00BFFF');
 
   useEffect(() => {
     AsyncStorage.getItem(THEME_STORAGE_KEY).then((s) => { if (s && s in THEMES) setThemeNameState(s as ThemeName); }).catch(() => {});
@@ -86,6 +111,15 @@ export const [ThemeProvider, useTheme] = createContextHook<ThemeState>(() => {
     AsyncStorage.getItem(BG_STORAGE_KEY).then((s) => { if (s === 'robot' || s === 'video1' || s === 'video2' || s === 'video3' || s === 'video4' || s === 'custom' || s === 'off') setBgTypeState(s); }).catch(() => {});
     AsyncStorage.getItem(CARDBG_STORAGE_KEY).then((s) => { if (s === 'thumbnail' || s === 'fullcover') setCardBgModeState(s); }).catch(() => {});
     AsyncStorage.getItem(SHAPE_STORAGE_KEY).then((s) => { if (s === 'rounded' || s === 'pill' || s === 'superpill') setCardShapeState(s); }).catch(() => {});
+    AsyncStorage.getItem(GLOW_STORAGE_KEY).then((s) => {
+      if (!s) return;
+      try {
+        const parsed = JSON.parse(s);
+        if (typeof parsed === 'string' && /^#[0-9A-Fa-f]{6}$/.test(parsed)) setGlowColorState(parsed);
+      } catch {
+        if (typeof s === 'string' && /^#[0-9A-Fa-f]{6}$/.test(s)) setGlowColorState(s);
+      }
+    }).catch(() => {});
   }, []);
 
   const setThemeName = useCallback((name: ThemeName) => { setThemeNameState(name); AsyncStorage.setItem(THEME_STORAGE_KEY, name).catch(() => {}); }, []);
@@ -96,12 +130,13 @@ export const [ThemeProvider, useTheme] = createContextHook<ThemeState>(() => {
   const setBgType = useCallback((b: BgType) => { setBgTypeState(b); AsyncStorage.setItem(BG_STORAGE_KEY, b).catch(() => {}); }, []);
   const setCardBgMode = useCallback((c: CardBgMode) => { setCardBgModeState(c); AsyncStorage.setItem(CARDBG_STORAGE_KEY, c).catch(() => {}); }, []);
   const setCardShape = useCallback((s: CardShape) => { setCardShapeState(s); AsyncStorage.setItem(SHAPE_STORAGE_KEY, s).catch(() => {}); }, []);
+  const setGlowColor = useCallback((c: string) => { setGlowColorState(c); AsyncStorage.setItem(GLOW_STORAGE_KEY, JSON.stringify(c)).catch(() => {}); }, []);
 
-  const theme = THEMES[themeName];
+  const theme = buildEffectiveTheme(THEMES[themeName], glowColor);
   const fontFamilyCSS = FONT_MAP[fontFamily];
   const textCaseCSS = TEXT_CASE_MAP[textCase];
 
-  return { themeName, theme, setThemeName, glassMode, setGlassMode, fontFamily, fontFamilyCSS, setFontFamily, heroStyle, setHeroStyle, textCase, textCaseCSS, setTextCase, bgType, setBgType, cardBgMode, setCardBgMode, cardShape, setCardShape };
+  return { themeName, theme, setThemeName, glassMode, setGlassMode, fontFamily, fontFamilyCSS, setFontFamily, heroStyle, setHeroStyle, textCase, textCaseCSS, setTextCase, bgType, setBgType, cardBgMode, setCardBgMode, cardShape, setCardShape, glowColor, setGlowColor };
 });
 
 export { THEMES, FONT_MAP, TEXT_CASE_MAP, GOOGLE_FONTS_URL };

@@ -40,12 +40,22 @@ const getEAImageUrl = (ea: any): string | null => {
   return 'https://eamobileconnect.com/admin/uploads/' + raw.replace(/^\/+/, '');
 };
 
+const hexToRgbString = (hex: string): string => {
+  const clean = hex.replace('#', '');
+  if (clean.length !== 6) return '0, 191, 255';
+  const r = parseInt(clean.slice(0, 2), 16);
+  const g = parseInt(clean.slice(2, 4), 16);
+  const b = parseInt(clean.slice(4, 6), 16);
+  if (isNaN(r) || isNaN(g) || isNaN(b)) return '0, 191, 255';
+  return `${r}, ${g}, ${b}`;
+};
+
 export function Sidebar() {
   const { isOpen, close } = useSidebar();
-  const { theme } = useTheme();
-  const { eas, isBotActive, heroHidden, setHeroHidden, glowColor, setGlowColor } = useApp();
-  const a = theme.accentRgb;
-  const ac = theme.accent;
+  const { eas, isBotActive, heroHidden, setHeroHidden } = useApp();
+  const { glowColor, setGlowColor } = useTheme();
+  const a = hexToRgbString(glowColor);
+  const ac = glowColor;
   const pathname = usePathname();
 
   const slideAnim = useRef(new Animated.Value(-SIDEBAR_WIDTH)).current;
@@ -96,21 +106,30 @@ export function Sidebar() {
           {primaryEA && (
             <View style={[
               styles.eaPill,
-              { borderColor: glowColor + '66' },
-              Platform.OS === 'web' && { boxShadow: `0 0 9px 2px ${glowColor}99, 0 0 24px 6px ${glowColor}40` } as any,
+              { borderColor: glowColor + '40' },
+              Platform.OS === 'web' && { boxShadow: `0 4px 14px rgba(0,0,0,0.45)` } as any,
             ]}>
-              <View style={styles.eaPillImageWrap}>
-                {primaryEAImage ? (
-                  <Image source={{ uri: primaryEAImage }} style={styles.eaPillImage} resizeMode="cover" />
-                ) : (
-                  <Image source={require('../assets/images/icon.png')} style={styles.eaPillImage} resizeMode="contain" />
-                )}
+              <View style={[
+                styles.eaPillAvatarRing,
+                { borderColor: glowColor + 'AA' },
+                Platform.OS === 'web' && { boxShadow: `0 0 4px 0 ${glowColor}66` } as any,
+              ]}>
+                <View style={styles.eaPillImageWrap}>
+                  {primaryEAImage ? (
+                    <Image source={{ uri: primaryEAImage }} style={styles.eaPillImage} resizeMode="cover" />
+                  ) : (
+                    <Image source={require('../assets/images/icon.png')} style={styles.eaPillImage} resizeMode="contain" />
+                  )}
+                </View>
               </View>
               <View style={styles.eaPillText}>
                 <Text style={styles.eaPillName} numberOfLines={1}>{primaryEA.name}</Text>
-                <Text style={[styles.eaPillStatus, { color: isBotActive ? '#16A34A' : 'rgba(255,255,255,0.4)' }]}>
-                  {isBotActive ? 'RUNNING' : 'IDLE'}
-                </Text>
+                <View style={styles.eaPillStatusRow}>
+                  <View style={[styles.eaPillStatusDot, { backgroundColor: isBotActive ? '#22C55E' : 'rgba(255,255,255,0.35)' }]} />
+                  <Text style={[styles.eaPillStatus, { color: isBotActive ? '#22C55E' : 'rgba(255,255,255,0.5)' }]}>
+                    {isBotActive ? 'RUNNING' : 'IDLE'}
+                  </Text>
+                </View>
               </View>
             </View>
           )}
@@ -275,19 +294,26 @@ const styles = StyleSheet.create({
   scroll: { flex: 1 },
   scrollContent: { paddingHorizontal: 16, paddingBottom: 24 },
   eaPill: {
-    flexDirection: 'row', alignItems: 'center', gap: 12,
-    paddingVertical: 10, paddingHorizontal: 12,
-    borderRadius: 16, borderWidth: 1.5,
-    backgroundColor: 'rgba(0,0,0,0.4)', marginBottom: 16,
+    flexDirection: 'row', alignItems: 'center', gap: 14,
+    paddingVertical: 12, paddingHorizontal: 14,
+    borderRadius: 20, borderWidth: 1.5,
+    backgroundColor: 'rgba(20,20,22,0.6)', marginBottom: 18,
+  },
+  eaPillAvatarRing: {
+    width: 60, height: 60, borderRadius: 30,
+    borderWidth: 2, padding: 2,
+    alignItems: 'center', justifyContent: 'center',
   },
   eaPillImageWrap: {
-    width: 40, height: 40, borderRadius: 12, overflow: 'hidden',
+    width: 52, height: 52, borderRadius: 26, overflow: 'hidden',
     backgroundColor: 'rgba(255,255,255,0.05)',
   },
   eaPillImage: { width: '100%', height: '100%' },
   eaPillText: { flex: 1 },
-  eaPillName: { fontSize: 14, fontWeight: '700', color: '#FFFFFF', letterSpacing: 0.3 },
-  eaPillStatus: { fontSize: 10, fontWeight: '700', letterSpacing: 1, marginTop: 2 },
+  eaPillName: { fontSize: 15, fontWeight: '700', color: '#FFFFFF', letterSpacing: 0.3 },
+  eaPillStatusRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 4 },
+  eaPillStatusDot: { width: 6, height: 6, borderRadius: 3 },
+  eaPillStatus: { fontSize: 10, fontWeight: '700', letterSpacing: 1.2 },
   navList: { gap: 6, marginBottom: 18 },
   navItem: {
     flexDirection: 'row', alignItems: 'center',

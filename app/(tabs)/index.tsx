@@ -22,8 +22,8 @@ const hexToRgbString = (hex: string): string => {
 };
 
 export default function HomeScreen() {
-  const { eas, isFirstTime, setIsFirstTime, removeEA, isBotActive, setBotActive, setActiveEA, user, heroHidden, glowColor } = useApp();
-  const { theme, glassMode, heroStyle, cardBgMode, cardShape } = useTheme();
+  const { eas, isFirstTime, setIsFirstTime, removeEA, isBotActive, setBotActive, setActiveEA, user, heroHidden } = useApp();
+  const { theme, glassMode, heroStyle, cardBgMode, cardShape, glowColor } = useTheme();
   const { toggle: toggleSidebar } = useSidebar();
   const isNeon = glassMode === 'neon';
   const isLiquid = glassMode === 'liquid';
@@ -241,8 +241,8 @@ export default function HomeScreen() {
         {primaryEAImage ? (
           <Image
             source={{ uri: primaryEAImage }}
-            style={[styles.hideBackdropImage, Platform.OS === 'web' && ({ objectPosition: 'center top' } as any)]}
-            resizeMode="contain"
+            style={[styles.hideBackdropImage, Platform.OS === 'web' && ({ objectPosition: 'center center' } as any)]}
+            resizeMode="cover"
           />
         ) : (
           <View style={styles.hideBackdropFallback}>

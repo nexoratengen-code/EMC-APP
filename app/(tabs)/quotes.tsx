@@ -170,8 +170,7 @@ export default function QuotesScreen() {
             }
           }
         } catch (e) { /* ignore */ }
-        setError('Failed to load symbols (offline)');
-        console.log('Using fallback mock data');
+        console.log('Using fallback mock data (symbols API unavailable, e.g. local dev CORS)');
         setQuotes(mockQuotes);
       }
     } finally {
