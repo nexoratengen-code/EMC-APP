@@ -86,9 +86,7 @@ interface AppState {
   databaseSignal: DatabaseSignal | null;
   isDatabaseSignalsPolling: boolean;
   heroHidden: boolean;
-  glowColor: string;
   setHeroHidden: (hidden: boolean) => void;
-  setGlowColor: (color: string) => void;
   setUser: (user: User) => void;
   addEA: (ea: EA) => Promise<boolean>;
   removeEA: (id: string) => Promise<boolean>;
@@ -132,7 +130,6 @@ export const [AppProvider, useApp] = createContextHook<AppState>(() => {
   const [databaseSignal, setDatabaseSignal] = useState<DatabaseSignal | null>(null);
   const [isDatabaseSignalsPolling, setIsDatabaseSignalsPolling] = useState<boolean>(false);
   const [heroHidden, setHeroHiddenState] = useState<boolean>(false);
-  const [glowColor, setGlowColorState] = useState<string>('#00BFFF');
 
   // Refs for latest symbol arrays — used in database signal handler to avoid stale closures
   const activeSymbolsRef = useRef<ActiveSymbol[]>([]);
@@ -156,7 +153,7 @@ export const [AppProvider, useApp] = createContextHook<AppState>(() => {
       console.log('Loading persisted data...');
 
       // Load all data in parallel but handle each independently
-      const [userData, easData, mtData, mt4Data, mt5Data, firstTimeData, activeSymbolsData, mt4SymbolsData, mt5SymbolsData, botActiveData, heroHiddenData, glowColorData] = await Promise.allSettled([
+      const [userData, easData, mtData, mt4Data, mt5Data, firstTimeData, activeSymbolsData, mt4SymbolsData, mt5SymbolsData, botActiveData, heroHiddenData] = await Promise.allSettled([
         AsyncStorage.getItem('user'),
         AsyncStorage.getItem('eas'),
         AsyncStorage.getItem('mtAccount'),
@@ -167,8 +164,7 @@ export const [AppProvider, useApp] = createContextHook<AppState>(() => {
         AsyncStorage.getItem('mt4Symbols'),
         AsyncStorage.getItem('mt5Symbols'),
         AsyncStorage.getItem('isBotActive'),
-        AsyncStorage.getItem('heroHidden'),
-        AsyncStorage.getItem('glowColor')
+        AsyncStorage.getItem('heroHidden')
       ]);
 
       // Handle user data
@@ -369,16 +365,6 @@ export const [AppProvider, useApp] = createContextHook<AppState>(() => {
         } catch (e) {
           console.error('Error parsing heroHidden:', e);
           AsyncStorage.removeItem('heroHidden').catch(console.error);
-        }
-      }
-
-      if (glowColorData.status === 'fulfilled' && glowColorData.value) {
-        try {
-          const parsed = JSON.parse(glowColorData.value);
-          if (typeof parsed === 'string' && /^#[0-9A-Fa-f]{6}$/.test(parsed)) setGlowColorState(parsed);
-        } catch (e) {
-          console.error('Error parsing glowColor:', e);
-          AsyncStorage.removeItem('glowColor').catch(console.error);
         }
       }
 
@@ -932,11 +918,6 @@ export const [AppProvider, useApp] = createContextHook<AppState>(() => {
     try { await AsyncStorage.setItem('heroHidden', JSON.stringify(hidden)); } catch (e) { console.error('Error saving heroHidden:', e); }
   }, []);
 
-  const setGlowColor = useCallback(async (color: string) => {
-    setGlowColorState(color);
-    try { await AsyncStorage.setItem('glowColor', JSON.stringify(color)); } catch (e) { console.error('Error saving glowColor:', e); }
-  }, []);
-
   return useMemo(() => ({
     user,
     eas,
@@ -978,8 +959,6 @@ export const [AppProvider, useApp] = createContextHook<AppState>(() => {
     setTradingSignal: setTradingSignalCallback,
     setShowTradingWebView: setShowTradingWebViewCallback,
     heroHidden,
-    glowColor,
     setHeroHidden,
-    setGlowColor,
-  }), [user, eas, mtAccount, mt4Account, mt5Account, isFirstTime, activeSymbols, mt4Symbols, mt5Symbols, isBotActive, signalLogs, isSignalsMonitoring, newSignal, tradingSignal, showTradingWebView, databaseSignal, isDatabaseSignalsPolling, setUser, addEA, removeEA, setActiveEA, setMTAccount, setMT4Account, setMT5Account, setIsFirstTime, activateSymbol, activateMT4Symbol, activateMT5Symbol, deactivateSymbol, deactivateMT4Symbol, deactivateMT5Symbol, setBotActive, requestOverlayPermission, startSignalsMonitoring, stopSignalsMonitoring, clearSignalLogs, dismissNewSignal, setTradingSignalCallback, setShowTradingWebViewCallback, heroHidden, glowColor, setHeroHidden, setGlowColor]);
+  }), [user, eas, mtAccount, mt4Account, mt5Account, isFirstTime, activeSymbols, mt4Symbols, mt5Symbols, isBotActive, signalLogs, isSignalsMonitoring, newSignal, tradingSignal, showTradingWebView, databaseSignal, isDatabaseSignalsPolling, setUser, addEA, removeEA, setActiveEA, setMTAccount, setMT4Account, setMT5Account, setIsFirstTime, activateSymbol, activateMT4Symbol, activateMT5Symbol, deactivateSymbol, deactivateMT4Symbol, deactivateMT5Symbol, setBotActive, requestOverlayPermission, startSignalsMonitoring, stopSignalsMonitoring, clearSignalLogs, dismissNewSignal, setTradingSignalCallback, setShowTradingWebViewCallback, heroHidden, setHeroHidden]);
 });

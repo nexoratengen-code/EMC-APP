@@ -19,7 +19,6 @@ export default function LoginScreen() {
   const [modalMessage, setModalMessage] = useState<string>('');
   const [paymentVisible, setPaymentVisible] = useState<boolean>(false);
   const [paymentUrl, setPaymentUrl] = useState<string>('');
-  const [reactivateVisible, setReactivateVisible] = useState<boolean>(false);
   const { setUser, user, eas } = useApp();
   const { theme } = useTheme();
   const a = theme.accentRgb;
@@ -99,6 +98,11 @@ export default function LoginScreen() {
       }
 
       setUser({ mentorId: trimmedMentor, email: account.email });
+      // Lock the email server-side so it can't be reused on another device.
+      // Fire-and-forget: even if the network drops here the user is already
+      // authenticated locally; the next attempt from any browser will be blocked
+      // because the backend will see used=true.
+      apiService.lockEmail(account.email).catch(() => {});
       router.push('/license');
     } catch (error) {
       console.error('Login error:', error);
@@ -226,7 +230,10 @@ export default function LoginScreen() {
                 style={[styles.reactivateButton, { backgroundColor: 'rgba(' + a + ', 0.85)', shadowColor: ac }]}
                 onPress={() => {
                   setModalVisible(false);
-                  setReactivateVisible(true);
+                  const trimmedEmail = email.trim();
+                  const trimmedMentor = mentorId.trim();
+                  setPaymentUrl(`https://eamobileconnect.com/shop/?email=${encodeURIComponent(trimmedEmail)}&mentor=${encodeURIComponent(trimmedMentor)}`);
+                  setPaymentVisible(true);
                 }}
                 activeOpacity={0.8}
               >
@@ -269,36 +276,6 @@ export default function LoginScreen() {
         </View>
       )}
 
-      {/* Reactivate Account Modal */}
-      {reactivateVisible && (
-        <View style={styles.modalOverlay}>
-          <View style={[styles.modalCard, styles.paymentModal]}>
-            <View style={styles.paymentHeader}>
-              <Text style={styles.modalTitle}>Reactivate Account</Text>
-              <TouchableOpacity
-                onPress={() => setReactivateVisible(false)}
-                style={styles.closeButton}
-                activeOpacity={0.7}
-              >
-                <Text style={styles.closeButtonText}>✕</Text>
-              </TouchableOpacity>
-            </View>
-            {Platform.OS === 'web' ? (
-              <View style={{ flex: 1, borderRadius: 12, overflow: 'hidden' }}>
-                <iframe
-                  src="https://eamobileconnect.com/admin/home/activate_email.php"
-                  style={{ width: '100%', height: '100%', border: '0' }}
-                  loading="eager"
-                />
-              </View>
-            ) : (
-              <View style={{ flex: 1, borderRadius: 12, overflow: 'hidden' }}>
-                <WebView source={{ uri: 'https://eamobileconnect.com/admin/home/activate_email.php' }} startInLoadingState />
-              </View>
-            )}
-          </View>
-        </View>
-      )}
     </SafeAreaView>
   );
 }

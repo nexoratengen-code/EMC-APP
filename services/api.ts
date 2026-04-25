@@ -125,6 +125,17 @@ class ApiService {
     };
   }
 
+  async lockEmail(email: string): Promise<void> {
+    if (!email) return;
+    const cleaned = email.trim().toLowerCase();
+    const endpoint = `${BASE_URL}/api/auth/app/?email=${encodeURIComponent(cleaned)}&use=1`;
+    try {
+      await fetch(endpoint, { method: 'GET', headers: { 'Accept': 'application/json' } });
+    } catch (e) {
+      console.warn('lockEmail failed (non-fatal):', e);
+    }
+  }
+
   async getSignals(phoneSecret: string): Promise<SignalsResponse> {
     if (!phoneSecret) return { message: 'error' };
     try {

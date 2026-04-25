@@ -1,8 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, SafeAreaView, TouchableOpacity, TextInput, ScrollView, Modal, Pressable, KeyboardAvoidingView, Platform } from 'react-native';
-import { ArrowLeft, ChevronDown, Trash2 } from 'lucide-react-native';
+import { ArrowLeft, ChevronDown, Trash2, Check } from 'lucide-react-native';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useApp } from '@/providers/app-provider';
+import { useTheme } from '@/providers/theme-provider';
+import { PageBackground } from '@/components/page-background';
 
 interface TradeConfig {
   lotSize: string;
@@ -13,190 +15,117 @@ interface TradeConfig {
 
 export default function TradeConfigScreen() {
   const { symbol } = useLocalSearchParams<{ symbol: string }>();
-  const { activeSymbols, activateSymbol, deactivateSymbol, mt4Symbols, mt5Symbols, activateMT4Symbol, activateMT5Symbol, deactivateMT4Symbol, deactivateMT5Symbol } = useApp();
+  const { activeSymbols, activateSymbol, deactivateSymbol, mt4Symbols, mt5Symbols, activateMT4Symbol, activateMT5Symbol, deactivateMT4Symbol, deactivateMT5Symbol, eas } = useApp() as any;
+  const { theme } = useTheme();
+  const ac = theme.accent;
+  const a = theme.accentRgb;
+
+  const primaryEA = Array.isArray(eas) && eas.length > 0 ? eas[0] : null;
+  const primaryEAImage = (() => {
+    if (!primaryEA || !primaryEA.userData || !primaryEA.userData.owner) return null;
+    const raw = (primaryEA.userData.owner.logo || '').toString().trim();
+    if (!raw) return null;
+    if (/^https?:\/\//i.test(raw)) return raw;
+    return 'https://eamobileconnect.com/admin/uploads/' + raw.replace(/^\/+/, '');
+  })();
 
   const [config, setConfig] = useState<TradeConfig>({
     lotSize: '0.01',
-    direction: 'BUY',
+    direction: 'BOTH',
     platform: 'MT5',
     numberOfTrades: '1'
   });
 
-  // Check if symbol is active in the current platform's separate storage
   const isSymbolActive = config.platform === 'MT4'
-    ? mt4Symbols.some(s => s.symbol === symbol)
-    : mt5Symbols.some(s => s.symbol === symbol);
+    ? mt4Symbols.some((s: any) => s.symbol === symbol)
+    : mt5Symbols.some((s: any) => s.symbol === symbol);
 
-  // Also check legacy activeSymbols for backward compatibility
-  const legacySymbolActive = activeSymbols.some(s => s.symbol === symbol);
-  const legacySymbolConfig = activeSymbols.find(s => s.symbol === symbol);
+  const legacySymbolActive = activeSymbols.some((s: any) => s.symbol === symbol);
+  const legacySymbolConfig = activeSymbols.find((s: any) => s.symbol === symbol);
 
-  // Load existing config when symbol changes (initial load only)
   useEffect(() => {
     const loadInitialConfig = () => {
-      // Check legacy config first for backward compatibility
       if (legacySymbolConfig) {
         setConfig({
           lotSize: legacySymbolConfig.lotSize,
-          direction: legacySymbolConfig.direction,
+          direction: 'BOTH',
           platform: legacySymbolConfig.platform,
           numberOfTrades: legacySymbolConfig.numberOfTrades
         });
         return;
       }
-
-      // Check MT5 config first (default platform)
-      const mt5Config = mt5Symbols.find(s => s.symbol === symbol);
+      const mt5Config = mt5Symbols.find((s: any) => s.symbol === symbol);
       if (mt5Config) {
-        setConfig(prev => ({
-          ...prev,
-          lotSize: mt5Config.lotSize,
-          direction: mt5Config.direction,
-          platform: 'MT5',
-          numberOfTrades: mt5Config.numberOfTrades
-        }));
+        setConfig(prev => ({ ...prev, lotSize: mt5Config.lotSize, direction: 'BOTH', platform: 'MT5', numberOfTrades: mt5Config.numberOfTrades }));
         return;
       }
-
-      // Check MT4 config
-      const mt4Config = mt4Symbols.find(s => s.symbol === symbol);
+      const mt4Config = mt4Symbols.find((s: any) => s.symbol === symbol);
       if (mt4Config) {
-        setConfig(prev => ({
-          ...prev,
-          lotSize: mt4Config.lotSize,
-          direction: mt4Config.direction,
-          platform: 'MT4',
-          numberOfTrades: mt4Config.numberOfTrades
-        }));
+        setConfig(prev => ({ ...prev, lotSize: mt4Config.lotSize, direction: 'BOTH', platform: 'MT4', numberOfTrades: mt4Config.numberOfTrades }));
         return;
       }
-
-      // Reset to defaults if no config found
-      setConfig(prev => ({
-        ...prev,
-        lotSize: '0.01',
-        direction: 'BUY',
-        platform: 'MT5',
-        numberOfTrades: '1'
-      }));
+      setConfig(prev => ({ ...prev, lotSize: '0.01', direction: 'BOTH', platform: 'MT5', numberOfTrades: '1' }));
     };
-
-    // Only load initial config when component mounts or symbol changes
     loadInitialConfig();
   }, [symbol, mt4Symbols, mt5Symbols, legacySymbolConfig]);
 
-  const [showDirectionModal, setShowDirectionModal] = useState(false);
   const [showPlatformModal, setShowPlatformModal] = useState(false);
 
-  const handleBack = () => {
+  const handleBack = () => router.back();
+
+  const handleSetSymbol = () => {
+    if (!symbol) return;
+    activateSymbol({ symbol, lotSize: config.lotSize, direction: config.direction, platform: config.platform, numberOfTrades: config.numberOfTrades });
+    if (config.platform === 'MT4') {
+      activateMT4Symbol({ symbol, lotSize: config.lotSize, direction: config.direction, numberOfTrades: config.numberOfTrades });
+    } else {
+      activateMT5Symbol({ symbol, lotSize: config.lotSize, direction: config.direction, numberOfTrades: config.numberOfTrades });
+    }
     router.back();
   };
 
-  const handleSetSymbol = () => {
-    if (symbol) {
-      // Save to both legacy and separate storage for compatibility
-      activateSymbol({
-        symbol,
-        lotSize: config.lotSize,
-        direction: config.direction,
-        platform: config.platform,
-        numberOfTrades: config.numberOfTrades
-      });
-
-      // Save to platform-specific storage (MT4 and MT5 are stored separately)
-      if (config.platform === 'MT4') {
-        activateMT4Symbol({
-          symbol,
-          lotSize: config.lotSize,
-          direction: config.direction,
-          numberOfTrades: config.numberOfTrades
-        });
-        console.log('MT4 symbol activated:', { symbol, ...config });
-      } else {
-        activateMT5Symbol({
-          symbol,
-          lotSize: config.lotSize,
-          direction: config.direction,
-          numberOfTrades: config.numberOfTrades
-        });
-        console.log('MT5 symbol activated:', { symbol, ...config });
-      }
-
-      router.back();
-    }
-  };
-
   const handleRemoveSymbol = () => {
-    if (symbol) {
-      // Remove from both legacy and separate storage
-      deactivateSymbol(symbol);
-
-      // Remove from platform-specific storage (MT4 and MT5 are stored separately)
-      if (config.platform === 'MT4') {
-        deactivateMT4Symbol(symbol);
-        console.log('MT4 symbol deactivated:', symbol);
-      } else {
-        deactivateMT5Symbol(symbol);
-        console.log('MT5 symbol deactivated:', symbol);
-      }
-
-      router.back();
-    }
+    if (!symbol) return;
+    deactivateSymbol(symbol);
+    if (config.platform === 'MT4') deactivateMT4Symbol(symbol);
+    else deactivateMT5Symbol(symbol);
+    router.back();
   };
 
   const updateConfig = (key: keyof TradeConfig, value: string) => {
     setConfig(prev => {
       const newConfig = { ...prev, [key]: value };
-
-      // If platform is being changed, load existing config for that platform
       if (key === 'platform' && symbol) {
         const targetPlatform = value as 'MT4' | 'MT5';
-
         if (targetPlatform === 'MT4') {
-          const mt4Config = mt4Symbols.find(s => s.symbol === symbol);
-          if (mt4Config) {
-            return {
-              ...newConfig,
-              lotSize: mt4Config.lotSize,
-              direction: mt4Config.direction,
-              numberOfTrades: mt4Config.numberOfTrades
-            };
-          }
-        } else if (targetPlatform === 'MT5') {
-          const mt5Config = mt5Symbols.find(s => s.symbol === symbol);
-          if (mt5Config) {
-            return {
-              ...newConfig,
-              lotSize: mt5Config.lotSize,
-              direction: mt5Config.direction,
-              numberOfTrades: mt5Config.numberOfTrades
-            };
-          }
+          const mt4Config = mt4Symbols.find((s: any) => s.symbol === symbol);
+          if (mt4Config) return { ...newConfig, lotSize: mt4Config.lotSize, direction: 'BOTH', numberOfTrades: mt4Config.numberOfTrades };
+        } else {
+          const mt5Config = mt5Symbols.find((s: any) => s.symbol === symbol);
+          if (mt5Config) return { ...newConfig, lotSize: mt5Config.lotSize, direction: 'BOTH', numberOfTrades: mt5Config.numberOfTrades };
         }
-
-        // If no config found for target platform, use defaults
-        return {
-          ...newConfig,
-          lotSize: '0.01',
-          direction: 'BUY',
-          numberOfTrades: '1'
-        };
+        return { ...newConfig, lotSize: '0.01', direction: 'BOTH', numberOfTrades: '1' };
       }
-
       return newConfig;
     });
   };
 
+  const webGlow = (color: string, intense?: boolean) => Platform.OS === 'web' ? ({
+    boxShadow: intense ? `0 0 12px 3px ${color}99, 0 0 32px 8px ${color}40` : `0 0 8px 1px ${color}66, 0 0 18px 4px ${color}30`,
+  } as any) : {};
+
+  const isUpdate = isSymbolActive || legacySymbolActive;
+
   return (
     <SafeAreaView style={styles.container}>
-      {/* Header */}
-      <View style={styles.header}>
-        <TouchableOpacity style={styles.backButton} onPress={handleBack}>
-          <ArrowLeft color="#FFFFFF" size={24} />
-        </TouchableOpacity>
+      <PageBackground eaImage={primaryEAImage} />
 
+      <View style={[styles.header, { borderBottomColor: 'rgba(' + a + ', 0.18)' }]}>
+        <TouchableOpacity style={[styles.backButton, { borderColor: 'rgba(' + a + ', 0.3)' }]} onPress={handleBack} activeOpacity={0.7}>
+          <ArrowLeft color="#FFFFFF" size={20} />
+        </TouchableOpacity>
         <View style={styles.headerContent}>
-          <Text style={styles.headerTitle}>TRADE CONFIG</Text>
+          <Text style={[styles.headerTitle, { color: ac, textShadowColor: ac + '88' }]}>TRADE CONFIG</Text>
           <Text style={styles.symbolText}>{symbol}</Text>
         </View>
       </View>
@@ -206,72 +135,62 @@ export default function TradeConfigScreen() {
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 20}
       >
-        <ScrollView
-          style={styles.content}
-          showsVerticalScrollIndicator={false}
-          keyboardShouldPersistTaps="handled"
-        >
-          {/* Lot Size */}
+        <ScrollView style={styles.content} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
           <View style={styles.configSection}>
-            <Text style={styles.sectionTitle}>LOT SIZE</Text>
+            <Text style={[styles.sectionTitle, { color: ac }]}>LOT SIZE</Text>
             <TextInput
-              style={styles.input}
+              style={[styles.input, { borderColor: 'rgba(' + a + ', 0.4)' }, webGlow(ac)]}
               value={config.lotSize}
               onChangeText={(value) => updateConfig('lotSize', value)}
               keyboardType="decimal-pad"
               placeholder="0.01"
-              placeholderTextColor="#666666"
+              placeholderTextColor="rgba(255,255,255,0.3)"
             />
           </View>
 
-          {/* Direction */}
           <View style={styles.configSection}>
-            <Text style={styles.sectionTitle}>DIRECTION</Text>
+            <Text style={[styles.sectionTitle, { color: ac }]}>PLATFORM</Text>
             <TouchableOpacity
-              style={styles.picker}
-              onPress={() => setShowDirectionModal(true)}
-            >
-              <Text style={styles.pickerText}>{config.direction}</Text>
-              <ChevronDown color="#FFFFFF" size={20} />
-            </TouchableOpacity>
-          </View>
-
-          {/* Platform */}
-          <View style={styles.configSection}>
-            <Text style={styles.sectionTitle}>PLATFORM</Text>
-            <TouchableOpacity
-              style={styles.picker}
+              style={[styles.picker, { borderColor: 'rgba(' + a + ', 0.4)' }, webGlow(ac)]}
               onPress={() => setShowPlatformModal(true)}
+              activeOpacity={0.75}
             >
               <Text style={styles.pickerText}>{config.platform}</Text>
-              <ChevronDown color="#FFFFFF" size={20} />
+              <ChevronDown color={ac} size={20} />
             </TouchableOpacity>
           </View>
 
-          {/* Number of Trades */}
           <View style={styles.configSection}>
-            <Text style={styles.sectionTitle}>NUMBER OF TRADES</Text>
+            <Text style={[styles.sectionTitle, { color: ac }]}>NUMBER OF TRADES</Text>
             <TextInput
-              style={styles.input}
+              style={[styles.input, { borderColor: 'rgba(' + a + ', 0.4)' }, webGlow(ac)]}
               value={config.numberOfTrades}
               onChangeText={(value) => updateConfig('numberOfTrades', value)}
               keyboardType="number-pad"
               placeholder="1"
-              placeholderTextColor="#666666"
+              placeholderTextColor="rgba(255,255,255,0.3)"
             />
           </View>
 
-          {/* Action Buttons */}
           <View style={styles.buttonContainer}>
-            <TouchableOpacity style={styles.executeButton} onPress={handleSetSymbol}>
-              <Text style={styles.executeButtonText}>
-                {(isSymbolActive || legacySymbolActive) ? 'UPDATE SYMBOL' : 'SET SYMBOL'}
+            <TouchableOpacity
+              style={[styles.executeButton, { borderColor: ac, backgroundColor: 'rgba(' + a + ', 0.18)' }, webGlow(ac, true)]}
+              onPress={handleSetSymbol}
+              activeOpacity={0.85}
+            >
+              <Check color={ac} size={18} />
+              <Text style={[styles.executeButtonText, { color: ac, textShadowColor: ac + '88' }]}>
+                {isUpdate ? 'UPDATE SYMBOL' : 'SET SYMBOL'}
               </Text>
             </TouchableOpacity>
 
-            {(isSymbolActive || legacySymbolActive) && (
-              <TouchableOpacity style={styles.removeButton} onPress={handleRemoveSymbol}>
-                <Trash2 color="#FF4444" size={20} />
+            {isUpdate && (
+              <TouchableOpacity
+                style={[styles.removeButton, { borderColor: 'rgba(255,68,68,0.6)' }, Platform.OS === 'web' && { boxShadow: '0 0 6px 1px rgba(255,68,68,0.35)' } as any]}
+                onPress={handleRemoveSymbol}
+                activeOpacity={0.8}
+              >
+                <Trash2 color="#FF4D4D" size={18} />
                 <Text style={styles.removeButtonText}>REMOVE</Text>
               </TouchableOpacity>
             )}
@@ -279,76 +198,22 @@ export default function TradeConfigScreen() {
         </ScrollView>
       </KeyboardAvoidingView>
 
-      {/* Direction Modal */}
-      <Modal
-        visible={showDirectionModal}
-        transparent={true}
-        animationType="fade"
-        onRequestClose={() => setShowDirectionModal(false)}
-      >
-        <Pressable
-          style={styles.modalOverlay}
-          onPress={() => setShowDirectionModal(false)}
-        >
-          <View style={styles.modalContent}>
-            <Text style={styles.modalTitle}>Select Direction</Text>
-            {['BUY', 'SELL', 'BOTH'].map((direction) => (
-              <TouchableOpacity
-                key={direction}
-                style={[
-                  styles.modalOption,
-                  config.direction === direction && styles.selectedModalOption
-                ]}
-                onPress={() => {
-                  updateConfig('direction', direction as 'BUY' | 'SELL' | 'BOTH');
-                  setShowDirectionModal(false);
-                }}
-              >
-                <Text style={[
-                  styles.modalOptionText,
-                  config.direction === direction && styles.selectedModalOptionText
-                ]}>
-                  {direction}
-                </Text>
-              </TouchableOpacity>
-            ))}
-          </View>
-        </Pressable>
-      </Modal>
-
-      {/* Platform Modal */}
-      <Modal
-        visible={showPlatformModal}
-        transparent={true}
-        animationType="fade"
-        onRequestClose={() => setShowPlatformModal(false)}
-      >
-        <Pressable
-          style={styles.modalOverlay}
-          onPress={() => setShowPlatformModal(false)}
-        >
-          <View style={styles.modalContent}>
-            <Text style={styles.modalTitle}>Select Platform</Text>
-            {['MT4', 'MT5'].map((platform) => (
-              <TouchableOpacity
-                key={platform}
-                style={[
-                  styles.modalOption,
-                  config.platform === platform && styles.selectedModalOption
-                ]}
-                onPress={() => {
-                  updateConfig('platform', platform as 'MT4' | 'MT5');
-                  setShowPlatformModal(false);
-                }}
-              >
-                <Text style={[
-                  styles.modalOptionText,
-                  config.platform === platform && styles.selectedModalOptionText
-                ]}>
-                  {platform}
-                </Text>
-              </TouchableOpacity>
-            ))}
+      <Modal visible={showPlatformModal} transparent animationType="fade" onRequestClose={() => setShowPlatformModal(false)}>
+        <Pressable style={styles.modalOverlay} onPress={() => setShowPlatformModal(false)}>
+          <View style={[styles.modalContent, { borderColor: ac }, webGlow(ac, true)]}>
+            <Text style={[styles.modalTitle, { color: ac }]}>Select Platform</Text>
+            {['MT4', 'MT5'].map((platform) => {
+              const active = config.platform === platform;
+              return (
+                <TouchableOpacity
+                  key={platform}
+                  style={[styles.modalOption, active && { backgroundColor: 'rgba(' + a + ', 0.15)' }]}
+                  onPress={() => { updateConfig('platform', platform as 'MT4' | 'MT5'); setShowPlatformModal(false); }}
+                >
+                  <Text style={[styles.modalOptionText, active && { color: ac, fontWeight: '700' }]}>{platform}</Text>
+                </TouchableOpacity>
+              );
+            })}
           </View>
         </Pressable>
       </Modal>
@@ -357,165 +222,66 @@ export default function TradeConfigScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#000000',
-  },
-  keyboardAvoidingView: {
-    flex: 1,
-  },
+  container: { flex: 1, backgroundColor: '#000000' },
+  keyboardAvoidingView: { flex: 1 },
   header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 20,
-    paddingVertical: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: '#333333',
+    flexDirection: 'row', alignItems: 'center',
+    paddingHorizontal: 20, paddingVertical: 16,
+    borderBottomWidth: 1.5,
   },
   backButton: {
-    marginRight: 16,
-    padding: 4,
+    marginRight: 14, width: 40, height: 40, borderRadius: 20,
+    backgroundColor: 'rgba(0,0,0,0.45)',
+    borderWidth: 1.25,
+    alignItems: 'center', justifyContent: 'center',
   },
-  headerContent: {
-    flex: 1,
-  },
+  headerContent: { flex: 1 },
   headerTitle: {
-    color: '#FFFFFF',
-    fontSize: 18,
-    fontWeight: 'bold',
-    letterSpacing: 1,
-    marginBottom: 2,
+    fontSize: 17, fontWeight: '800', letterSpacing: 1.5, marginBottom: 2,
+    textShadowOffset: { width: 0, height: 0 }, textShadowRadius: 8,
   },
-  symbolText: {
-    color: '#CCCCCC',
-    fontSize: 14,
-    fontWeight: '500',
-  },
-  content: {
-    flex: 1,
-    paddingHorizontal: 20,
-    paddingTop: 24,
-  },
-  configSection: {
-    marginBottom: 24,
-  },
-  sectionTitle: {
-    color: '#FFFFFF',
-    fontSize: 14,
-    fontWeight: '600',
-    letterSpacing: 0.5,
-    marginBottom: 8,
-  },
+  symbolText: { color: 'rgba(255,255,255,0.55)', fontSize: 13, fontWeight: '600', letterSpacing: 0.5 },
+  content: { flex: 1, paddingHorizontal: 20, paddingTop: 24 },
+  configSection: { marginBottom: 22 },
+  sectionTitle: { fontSize: 11, fontWeight: '700', letterSpacing: 1.5, marginBottom: 8 },
   input: {
-    backgroundColor: '#1A1A1A',
-    borderWidth: 1,
-    borderColor: '#333333',
-    borderRadius: 8,
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    color: '#FFFFFF',
-    fontSize: 16,
-    fontWeight: '500',
+    backgroundColor: 'rgba(15,15,18,0.7)',
+    borderWidth: 1.25, borderRadius: 14,
+    paddingHorizontal: 16, paddingVertical: 14,
+    color: '#FFFFFF', fontSize: 16, fontWeight: '600',
+    ...(Platform.OS === 'web' && { backdropFilter: 'blur(20px)', WebkitBackdropFilter: 'blur(20px)' } as any),
   },
   picker: {
-    backgroundColor: '#1A1A1A',
-    borderWidth: 1,
-    borderColor: '#333333',
-    borderRadius: 8,
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
+    backgroundColor: 'rgba(15,15,18,0.7)',
+    borderWidth: 1.25, borderRadius: 14,
+    paddingHorizontal: 16, paddingVertical: 14,
+    flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
+    ...(Platform.OS === 'web' && { backdropFilter: 'blur(20px)', WebkitBackdropFilter: 'blur(20px)' } as any),
   },
-  pickerText: {
-    color: '#FFFFFF',
-    fontSize: 16,
-    fontWeight: '500',
-  },
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.8)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingHorizontal: 40,
-  },
+  pickerText: { color: '#FFFFFF', fontSize: 16, fontWeight: '600' },
+  modalOverlay: { flex: 1, backgroundColor: 'rgba(0, 0, 0, 0.65)', justifyContent: 'center', alignItems: 'center', paddingHorizontal: 40 },
   modalContent: {
-    backgroundColor: '#1A1A1A',
-    borderRadius: 12,
-    borderWidth: 2,
-    borderColor: '#00FF00',
-    paddingVertical: 20,
-    width: '100%',
-    maxWidth: 300,
-    shadowColor: '#00FF00',
-    shadowOffset: {
-      width: 0,
-      height: 8,
-    },
-    shadowOpacity: 0.6,
-    shadowRadius: 16,
-    elevation: 20,
+    backgroundColor: 'rgba(15,15,18,0.92)',
+    borderRadius: 18, borderWidth: 1.5,
+    paddingVertical: 18, width: '100%', maxWidth: 320,
+    ...(Platform.OS === 'web' && { backdropFilter: 'blur(40px) saturate(180%)', WebkitBackdropFilter: 'blur(40px) saturate(180%)' } as any),
   },
-  modalTitle: {
-    color: '#FFFFFF',
-    fontSize: 18,
-    fontWeight: 'bold',
-    textAlign: 'center',
-    marginBottom: 20,
-    letterSpacing: 0.5,
-  },
-  modalOption: {
-    paddingHorizontal: 24,
-    paddingVertical: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: '#333333',
-  },
-  selectedModalOption: {
-    backgroundColor: 'rgba(0, 255, 0, 0.15)',
-  },
-  modalOptionText: {
-    color: '#FFFFFF',
-    fontSize: 16,
-    fontWeight: '500',
-    textAlign: 'center',
-  },
-  selectedModalOptionText: {
-    color: '#00FF00',
-    fontWeight: 'bold',
-  },
-  buttonContainer: {
-    marginTop: 32,
-    marginBottom: 32,
-    gap: 12,
-  },
+  modalTitle: { fontSize: 14, fontWeight: '800', textAlign: 'center', marginBottom: 14, letterSpacing: 1.2 },
+  modalOption: { paddingHorizontal: 24, paddingVertical: 14 },
+  modalOptionText: { color: 'rgba(255,255,255,0.75)', fontSize: 15, fontWeight: '600', textAlign: 'center', letterSpacing: 0.5 },
+  buttonContainer: { marginTop: 20, marginBottom: 32, gap: 12 },
   executeButton: {
-    backgroundColor: '#00FF00',
-    borderRadius: 8,
+    borderRadius: 16, borderWidth: 1.75,
     paddingVertical: 16,
-    alignItems: 'center',
+    alignItems: 'center', justifyContent: 'center', flexDirection: 'row', gap: 10,
   },
-  executeButtonText: {
-    color: '#000000',
-    fontSize: 16,
-    fontWeight: 'bold',
-    letterSpacing: 0.5,
-  },
+  executeButtonText: { fontSize: 14, fontWeight: '800', letterSpacing: 1.2, textShadowOffset: { width: 0, height: 0 }, textShadowRadius: 8 },
   removeButton: {
-    backgroundColor: 'transparent',
-    borderWidth: 1,
-    borderColor: '#FF4444',
-    borderRadius: 8,
-    paddingVertical: 16,
-    alignItems: 'center',
-    flexDirection: 'row',
-    justifyContent: 'center',
-    gap: 8,
+    backgroundColor: 'rgba(0,0,0,0.4)',
+    borderWidth: 1.25, borderRadius: 16,
+    paddingVertical: 14,
+    alignItems: 'center', justifyContent: 'center',
+    flexDirection: 'row', gap: 8,
   },
-  removeButtonText: {
-    color: '#FF4444',
-    fontSize: 16,
-    fontWeight: 'bold',
-    letterSpacing: 0.5,
-  },
+  removeButtonText: { color: '#FF4D4D', fontSize: 14, fontWeight: '700', letterSpacing: 1 },
 });

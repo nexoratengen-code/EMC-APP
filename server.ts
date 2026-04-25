@@ -1384,7 +1384,7 @@ async function handleApi(request: Request): Promise<Response> {
 
     // Add terminal-proxy routing
     if (pathname === '/api/terminal-proxy') {
-      const route = await import('./app/api/terminal-proxy.ts');
+      const route = await import('./server-routes/terminal-proxy.ts');
       if (request.method === 'GET' && typeof route.default === 'function') {
         // Convert Bun Request to Express-like request/response
         const expressReq = {
