@@ -255,6 +255,14 @@ export default function HomeScreen() {
         </TouchableOpacity>
 
         <View style={styles.hideBottomStack} pointerEvents="box-none">
+          {primaryEA && (
+            <View style={[styles.hideEaName, { borderColor: ac + '55' }, Platform.OS === 'web' && { boxShadow: `0 0 8px 1px ${ac}55, 0 4px 12px rgba(0,0,0,0.5)` } as any]}>
+              <Text style={[styles.hideEaNameText, { color: ac, textShadowColor: ac + '99' }]} numberOfLines={1}>{primaryEA.name}</Text>
+              <Text style={[styles.hideEaNameStatus, { color: isBotActive ? '#22C55E' : 'rgba(255,255,255,0.5)' }]}>
+                {isBotActive ? '● RUNNING' : '○ IDLE'}
+              </Text>
+            </View>
+          )}
           <View style={styles.poweredByWrap}>
             <Text style={styles.poweredByText}>Powered by <Text style={[styles.poweredByAccent, { color: ac }]}>EA Mobile Connect</Text></Text>
           </View>
@@ -602,8 +610,32 @@ const styles = StyleSheet.create({
     right: 0,
     bottom: 0,
     paddingHorizontal: 16,
-    paddingBottom: 32,
-    gap: 10,
+    paddingBottom: Platform.OS === 'web' ? 56 : 64,
+    gap: 12,
+  },
+  hideEaName: {
+    alignSelf: 'center',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+    borderRadius: 20,
+    borderWidth: 1.25,
+    backgroundColor: 'rgba(0,0,0,0.55)',
+    marginBottom: 4,
+  },
+  hideEaNameText: {
+    fontSize: 14,
+    fontWeight: '800',
+    letterSpacing: 1.2,
+    textShadowOffset: { width: 0, height: 0 },
+    textShadowRadius: 8,
+  },
+  hideEaNameStatus: {
+    fontSize: 9,
+    fontWeight: '700',
+    letterSpacing: 1.2,
   },
   /* ========== SPLASH ========== */
   splashContainer: {
