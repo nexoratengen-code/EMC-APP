@@ -68,13 +68,17 @@ const CMD_CHIPS = [
 ];
 
 const COLORS: ThemeName[] = ['red', 'blue', 'green', 'purple', 'orange', 'cyan'];
+const GLOW_HEX = [
+  '#00BFFF', '#A855F7', '#00FF88', '#FF3366', '#FF6B00', '#FFD700', '#FF00FF',
+  '#EF4444', '#3B82F6', '#14B8A6', '#84CC16', '#00FFCC', '#EC4899', '#FFFFFF',
+];
 const GLASSES: GlassMode[] = ['neon', 'minimal', 'liquid', 'commander', 'mech'];
 
 interface DynamicIslandProps { visible: boolean; newSignal?: SignalLog | null; onSignalDismiss?: () => void; }
 
 export function DynamicIsland({ visible, newSignal, onSignalDismiss }: DynamicIslandProps) {
   const { eas, isBotActive, setBotActive, removeEA, signalLogs, isSignalsMonitoring, activeSymbols, mt4Symbols, mt5Symbols, setTradingSignal, setShowTradingWebView } = useApp();
-  const { theme, themeName, glassMode, setThemeName, setGlassMode } = useTheme();
+  const { theme, themeName, glassMode, setThemeName, setGlassMode, glowColor, setGlowColor } = useTheme();
   const [expanded, setExpanded] = useState(false);
   const [voiceOn, setVoiceOn] = useState(false);
   const [vLabel, setVLabel] = useState('VOICE ASSISTANT');
@@ -369,11 +373,14 @@ export function DynamicIsland({ visible, newSignal, onSignalDismiss }: DynamicIs
           <View style={styles.sec}>
             <Text style={styles.secLbl}>COLOR</Text>
             <View style={styles.colorRow}>
-              {COLORS.map(c => (
-                <TouchableOpacity key={c} style={[styles.colorDot, { borderColor: themeName === c ? theme.accent : 'transparent' }]} onPress={() => setThemeName(c)} activeOpacity={0.7}>
-                  <View style={[styles.colorIn, { backgroundColor: c === 'red' ? '#8B5CF6' : c === 'blue' ? '#1A8FFF' : c === 'green' ? '#1AFF5E' : c === 'purple' ? '#8B5CF6' : c === 'orange' ? '#FF8C1A' : '#06D6E0' }]} />
-                </TouchableOpacity>
-              ))}
+              {GLOW_HEX.map(c => {
+                const active = (glowColor || '').toLowerCase() === c.toLowerCase();
+                return (
+                  <TouchableOpacity key={c} style={[styles.colorDot, { borderColor: active ? '#FFFFFF' : 'transparent' }]} onPress={() => setGlowColor(c)} activeOpacity={0.7}>
+                    <View style={[styles.colorIn, { backgroundColor: c }]} />
+                  </TouchableOpacity>
+                );
+              })}
             </View>
           </View>
 
