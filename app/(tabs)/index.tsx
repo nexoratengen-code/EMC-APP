@@ -610,7 +610,7 @@ const styles = StyleSheet.create({
     right: 0,
     bottom: 0,
     paddingHorizontal: 16,
-    paddingBottom: Platform.OS === 'web' ? 56 : 64,
+    paddingBottom: Platform.OS === 'web' ? 320 : 328,
     gap: 12,
   },
   hideEaName: {
