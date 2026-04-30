@@ -76,22 +76,12 @@ export default function QuotesScreen() {
       }
       setError(null);
 
-      // If we have a connected EA with phone secret, fetch from API
       let response: { data: ApiSymbol[] } = { data: [] };
       if (hasConnectedEA && primaryEA?.phoneSecretKey) {
         const apiRes = await apiService.getSymbols(primaryEA.phoneSecretKey);
         if (apiRes.message === 'accept' && Array.isArray(apiRes.data)) {
           response = { data: apiRes.data };
         }
-      }
-      // Fallback mock if API not available or no connected EA
-      if (response.data.length === 0) {
-        response.data = [
-          { id: '1', name: 'EURUSD' },
-          { id: '2', name: 'GBPUSD' },
-          { id: '3', name: 'XAUUSD' },
-          { id: '4', name: 'USDJPY' },
-        ];
       }
 
       setApiSymbols(response.data);
@@ -145,34 +135,14 @@ export default function QuotesScreen() {
       });
 
       setQuotes(newQuotes);
-      // Cache symbols in localStorage for persistence
       try {
         if (typeof window !== 'undefined' && window.localStorage) {
-          window.localStorage.setItem('cached_symbols', JSON.stringify(response.data));
+          window.localStorage.removeItem('cached_symbols');
         }
       } catch (e) { /* ignore */ }
     } catch (error) {
       console.error('Error fetching symbols:', error);
-      // Only show error if we have no quotes at all
-      if (quotes.length === 0) {
-        // Try cached symbols first
-        try {
-          if (typeof window !== 'undefined' && window.localStorage) {
-            const cached = window.localStorage.getItem('cached_symbols');
-            if (cached) {
-              const parsed = JSON.parse(cached);
-              if (Array.isArray(parsed) && parsed.length > 0) {
-                setApiSymbols(parsed);
-                setQuotes(parsed.map(s => ({ symbol: s.name, lotSize: 0.01, platform: 'MT5', direction: 'BUY' })));
-                console.log('Loaded symbols from cache');
-                return;
-              }
-            }
-          }
-        } catch (e) { /* ignore */ }
-        console.log('Using fallback mock data (symbols API unavailable, e.g. local dev CORS)');
-        setQuotes(mockQuotes);
-      }
+      setQuotes([]);
     } finally {
       // Add a small delay to make the refresh feel more natural
       setTimeout(() => {
@@ -180,7 +150,7 @@ export default function QuotesScreen() {
         setRefreshing(false);
       }, showRefreshIndicator ? 300 : 0);
     }
-  }, [activeSymbols, mt4Symbols, mt5Symbols, quotes.length]);
+  }, [hasConnectedEA, primaryEA?.phoneSecretKey, activeSymbols, mt4Symbols, mt5Symbols, quotes.length]);
 
   // Initial load and refresh when symbols change
   useEffect(() => {
