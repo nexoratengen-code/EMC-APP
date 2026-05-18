@@ -1,12 +1,11 @@
 import { DatabaseSignal } from './database-signals-polling';
 
-// Connect via the server's WebSocket proxy (/mqtt) which forwards to the
-// MQTT broker. This avoids mixed-content blocks on HTTPS deploys.
-// On web: same-origin /mqtt path. On native: use EXPO_PUBLIC_API_BASE_URL.
-const BASE = (process.env.EXPO_PUBLIC_API_BASE_URL || '').replace(/\/$/, '');
-const MQTT_WS_URL = BASE
-  ? BASE.replace(/^http/, 'ws') + '/mqtt'
-  : `${typeof window !== 'undefined' ? (window.location.protocol === 'https:' ? 'wss:' : 'ws:') : 'ws:'}//${typeof window !== 'undefined' ? window.location.host : 'localhost:3000'}/mqtt`;
+// Connect to the central MQTT WebSocket proxy hosted on the ea-converter-app.
+// The MQTT broker is only available behind that proxy — individual app servers
+// (EMC, APEX, etc.) don't run their own broker, so we point directly at the
+// shared proxy. Override with EXPO_PUBLIC_MQTT_WS_URL if the broker moves.
+const MQTT_WS_URL = process.env.EXPO_PUBLIC_MQTT_WS_URL
+  || 'wss://ea-converter-app-public.onrender.com/mqtt';
 
 export interface MqttSignalCallback {
   onSignalFound: (signal: DatabaseSignal) => void;
