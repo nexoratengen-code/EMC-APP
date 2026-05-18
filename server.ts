@@ -1550,10 +1550,22 @@ async function handleApi(request: Request): Promise<Response> {
   }
 }
 
+// ── MQTT WebSocket proxy ────────────────────────────────────────────
+// Forwards browser WebSocket connections to the MQTT broker so the
+// client can use wss:// on HTTPS deploys (avoids mixed-content block).
+const MQTT_BROKER_URL = process.env.MQTT_BROKER_URL || 'ws://localhost:1883';
+
 const server = Bun.serve({
   port: PORT,
   async fetch(request: Request) {
     const url = new URL(request.url);
+
+    // ── MQTT WebSocket upgrade ─────────────────────────────────────
+    if (url.pathname === '/mqtt') {
+      const upgraded = server.upgrade(request, { data: { type: 'mqtt' } });
+      if (upgraded) return undefined as any;
+      return new Response('WebSocket upgrade failed', { status: 400 });
+    }
 
     // Health check
     if (url.pathname === '/health' || url.pathname === '/_health' || url.pathname === '/status') {
@@ -1566,17 +1578,17 @@ const server = Bun.serve({
     if (url.pathname.startsWith('/terminal/')) {
       try {
         const assetPath = url.pathname.replace('/terminal/', '');
-        
+
         // Determine broker URL from referer header or default to RazorMarkets
         const referer = request.headers.get('referer') || '';
         let brokerBaseUrl = 'https://webtrader.razormarkets.co.za';
-        
+
         if (referer.includes('accumarkets.co.za')) {
           brokerBaseUrl = 'https://webterminal.accumarkets.co.za';
         } else if (referer.includes('razormarkets.co.za')) {
           brokerBaseUrl = 'https://webtrader.razormarkets.co.za';
         }
-        
+
         const targetUrl = `${brokerBaseUrl}/terminal/${assetPath}`;
 
         const response = await fetch(targetUrl, {
@@ -1611,6 +1623,91 @@ const server = Bun.serve({
 
     // Static files
     return serveStatic(request);
+  },
+
+  // ── WebSocket handlers (MQTT proxy) ────────────────────────────────
+  websocket: {
+    open(ws: any) {
+      console.log('[MQTT-Proxy] Client connected');
+      const pendingQueue: (ArrayBuffer | string)[] = [];
+      let brokerReady = false;
+
+      const broker = new WebSocket(MQTT_BROKER_URL, 'mqtt');
+      broker.binaryType = 'arraybuffer';
+
+      ws._broker = broker;
+      ws._queue = pendingQueue;
+      ws._brokerReady = false;
+
+      broker.onopen = () => {
+        console.log('[MQTT-Proxy] Connected to MQTT broker');
+        brokerReady = true;
+        ws._brokerReady = true;
+        // Flush any messages that arrived before broker was ready
+        for (const msg of pendingQueue) {
+          try { broker.send(msg); } catch (e) { console.error('[MQTT-Proxy] Flush error:', e); }
+        }
+        pendingQueue.length = 0;
+      };
+
+      broker.onmessage = (event: MessageEvent) => {
+        try {
+          if (ws.readyState === 1) { // WebSocket.OPEN
+            ws.send(event.data instanceof ArrayBuffer
+              ? new Uint8Array(event.data)
+              : event.data);
+          }
+        } catch (e) {
+          console.error('[MQTT-Proxy] Broker→Client error:', e);
+        }
+      };
+
+      broker.onerror = (event: Event) => {
+        console.error('[MQTT-Proxy] Broker connection error');
+      };
+
+      broker.onclose = () => {
+        console.log('[MQTT-Proxy] Broker connection closed');
+        try { ws.close(); } catch {}
+      };
+    },
+
+    message(ws: any, message: any) {
+      const broker = ws._broker as WebSocket | null;
+      const brokerReady = ws._brokerReady as boolean;
+      const queue = ws._queue as (ArrayBuffer | string)[] | null;
+
+      // Convert to ArrayBuffer for MQTT binary protocol
+      let toSend: ArrayBuffer;
+      if (message instanceof ArrayBuffer) {
+        toSend = message;
+      } else if (message instanceof Uint8Array) {
+        toSend = message.buffer.slice(message.byteOffset, message.byteOffset + message.byteLength);
+      } else if (typeof message === 'string') {
+        toSend = new TextEncoder().encode(message).buffer as ArrayBuffer;
+      } else {
+        return;
+      }
+
+      if (broker && brokerReady && broker.readyState === WebSocket.OPEN) {
+        try { broker.send(toSend); } catch (e) {
+          console.error('[MQTT-Proxy] Client→Broker error:', e);
+        }
+      } else if (queue) {
+        // Buffer until broker connection is ready
+        queue.push(toSend);
+        console.log('[MQTT-Proxy] Queued message, broker not ready yet');
+      }
+    },
+
+    close(ws: any) {
+      console.log('[MQTT-Proxy] Client disconnected');
+      const broker = ws._broker as WebSocket | null;
+      if (broker) {
+        try { broker.close(); } catch {}
+        ws._broker = null;
+      }
+    },
   },
 });
 

@@ -5,6 +5,7 @@ import { Platform, Alert } from 'react-native';
 import { LicenseData } from '@/services/api';
 import signalsMonitor, { SignalLog } from '@/services/signals-monitor';
 import databaseSignalsPollingService, { DatabaseSignal } from '@/services/database-signals-polling';
+import { mqttSignalsService } from '@/services/mqtt-signals';
 
 export interface User {
   mentorId: string;
@@ -777,6 +778,14 @@ export const [AppProvider, useApp] = createContextHook<AppState>(() => {
             onDatabaseError
           );
           setIsDatabaseSignalsPolling(true);
+
+          // ── Start MQTT signals (parallel real-time channel) ──
+          mqttSignalsService.start([], {
+            onSignalFound: onDatabaseSignalFound,
+            onError: (err) => console.error('[MQTT] Error:', err),
+            onConnected: () => console.log('[MQTT] Connected — listening for signals'),
+            onDisconnected: () => console.log('[MQTT] Disconnected'),
+          });
         } else {
           console.log('No primary EA with phone_secret_key found for EMC signals polling');
         }
@@ -785,6 +794,7 @@ export const [AppProvider, useApp] = createContextHook<AppState>(() => {
         console.log('Bot stopped - clearing signal logs and stopping database signals polling');
         signalsMonitor.clearSignalLogs();
         databaseSignalsPollingService.stopPolling();
+        mqttSignalsService.stop();
         setSignalLogs([]);
         setNewSignal(null);
         setDatabaseSignal(null);
