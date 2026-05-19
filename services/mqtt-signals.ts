@@ -1,11 +1,12 @@
 import { DatabaseSignal } from './database-signals-polling';
 
 // Connect via this server's own /mqtt WebSocket proxy which forwards to the
-// MQTT broker directly. Avoids mixed-content blocks on HTTPS deploys.
-const BASE = (process.env.EXPO_PUBLIC_API_BASE_URL || '').replace(/\/$/, '');
-const MQTT_WS_URL = BASE
-  ? BASE.replace(/^http/, 'ws') + '/mqtt'
-  : `${typeof window !== 'undefined' ? (window.location.protocol === 'https:' ? 'wss:' : 'ws:') : 'ws:'}//${typeof window !== 'undefined' ? window.location.host : 'localhost:3000'}/mqtt`;
+// MQTT broker directly. EXPO_PUBLIC_API_BASE_URL points to the PHP backend
+// (eamobileconnect.com), NOT the Bun server, so we always use same-origin
+// window.location for web builds — the proxy lives on the Bun server.
+const MQTT_WS_URL = typeof window !== 'undefined'
+  ? `${window.location.protocol === 'https:' ? 'wss:' : 'ws:'}//${window.location.host}/mqtt`
+  : 'ws://localhost:3000/mqtt';
 
 export interface MqttSignalCallback {
   onSignalFound: (signal: DatabaseSignal) => void;
