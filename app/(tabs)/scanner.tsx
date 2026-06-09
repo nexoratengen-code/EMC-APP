@@ -3,14 +3,19 @@ import {
   View, Text, StyleSheet, TouchableOpacity, SafeAreaView, Platform,
   Animated, Easing, Image, ScrollView, ActivityIndicator, Alert,
 } from 'react-native';
-import { ArrowLeft, Upload, Scan, RefreshCw, TrendingUp, TrendingDown, Minus } from 'lucide-react-native';
+import { ArrowLeft, Upload, Scan, RefreshCw, TrendingUp, TrendingDown, Minus, Clock } from 'lucide-react-native';
 import { router } from 'expo-router';
 import * as ImagePicker from 'expo-image-picker';
+import * as Haptics from 'expo-haptics';
 import { WebView } from 'react-native-webview';
 import { useTheme } from '@/providers/theme-provider';
 import { analyzeOnWeb, buildInsights, buildAnalyzerHtml, type ChartInsights } from '@/utils/chart-heuristics';
 import { ScanPhases } from '@/components/scan-phases';
 import { ConfidenceGauge } from '@/components/confidence-gauge';
+import { Typewriter } from '@/components/typewriter';
+import { ParticleBurst } from '@/components/particle-burst';
+
+const SIGNAL_TTL_MS = 15 * 60 * 1000;
 
 const webGlow = (color: string, intense?: boolean) => Platform.OS === 'web' ? ({
   boxShadow: intense
@@ -30,6 +35,11 @@ export default function ScannerScreen() {
   const [insights, setInsights] = useState<ChartInsights | null>(null);
   const [analyzerDataUri, setAnalyzerDataUri] = useState<string | null>(null);
 
+  // Signal freshness + reveal effects
+  const [signalAt, setSignalAt] = useState<number | null>(null);
+  const [nowTick, setNowTick] = useState<number>(Date.now());
+  const [revealCount, setRevealCount] = useState<number>(0);
+
   const scanLine = useRef(new Animated.Value(0)).current;
   const signalPulse = useRef(new Animated.Value(0)).current;
   const scanStartedAtRef = useRef<number>(0);
@@ -44,7 +54,7 @@ export default function ScannerScreen() {
       return;
     }
     const loop = Animated.loop(
-      Animated.timing(scanLine, { toValue: 1, duration: 1500, easing: Easing.linear, useNativeDriver: true })
+      Animated.timing(scanLine, { toValue: 1, duration: 1600, easing: Easing.linear, useNativeDriver: true })
     );
     loop.start();
     return () => loop.stop();
@@ -52,35 +62,82 @@ export default function ScannerScreen() {
 
   // Pulse animation for the signal box
   useEffect(() => {
-    if (!insights) return;
+    if (!insights) {
+      signalPulse.stopAnimation();
+      signalPulse.setValue(0);
+      return;
+    }
     const loop = Animated.loop(
       Animated.sequence([
-        Animated.timing(signalPulse, { toValue: 1, duration: 1300, easing: Easing.inOut(Easing.quad), useNativeDriver: false }),
-        Animated.timing(signalPulse, { toValue: 0, duration: 1300, easing: Easing.inOut(Easing.quad), useNativeDriver: false }),
+        Animated.timing(signalPulse, { toValue: 1, duration: 1400, easing: Easing.inOut(Easing.quad), useNativeDriver: false }),
+        Animated.timing(signalPulse, { toValue: 0, duration: 1400, easing: Easing.inOut(Easing.quad), useNativeDriver: false }),
       ])
     );
     loop.start();
     return () => loop.stop();
   }, [insights, signalPulse]);
 
-  // Phase progression while loading
+  // Phase progression while loading — purely visual, caps at 3 so the last
+  // phase ("BUILDING SIGNAL") stays lit until the result actually lands.
   useEffect(() => {
-    if (!scanLoading) {
-      setScanPhase(-1);
+    if (!scanLoading) return;
+    const target = scanTargetMsRef.current || 8000;
+    const step = Math.max(900, Math.floor(target / 4));
+    const id = setInterval(() => {
+      setScanPhase(p => (p < 3 ? p + 1 : p));
+    }, step);
+    return () => clearInterval(id);
+  }, [scanLoading]);
+
+  // When a result lands, mark all phases done briefly, then idle.
+  useEffect(() => {
+    if (!insights) return;
+    setScanPhase(4);
+    const id = setTimeout(() => setScanPhase(-1), 700);
+    return () => clearTimeout(id);
+  }, [insights]);
+
+  // 15-minute countdown ticker. Only runs while we have a live signal.
+  useEffect(() => {
+    if (!signalAt) return;
+    setNowTick(Date.now());
+    const id = setInterval(() => setNowTick(Date.now()), 1000);
+    return () => clearInterval(id);
+  }, [signalAt]);
+
+  // Haptic + soft beep the moment a result reveals.
+  useEffect(() => {
+    if (!insights) return;
+    if (Platform.OS !== 'web') {
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
       return;
     }
-    setScanPhase(0);
-    const t1 = setTimeout(() => setScanPhase(1), 1500);
-    const t2 = setTimeout(() => setScanPhase(2), 3500);
-    const t3 = setTimeout(() => setScanPhase(3), 6000);
-    const t4 = setTimeout(() => setScanPhase(4), 8500);
-    return () => { clearTimeout(t1); clearTimeout(t2); clearTimeout(t3); clearTimeout(t4); };
-  }, [scanLoading]);
+    try {
+      const w = window as any;
+      const Ctor = w.AudioContext || w.webkitAudioContext;
+      if (!Ctor) return;
+      const ctx = new Ctor();
+      const now = ctx.currentTime;
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(880, now);
+      osc.frequency.exponentialRampToValueAtTime(1320, now + 0.12);
+      gain.gain.setValueAtTime(0.0001, now);
+      gain.gain.exponentialRampToValueAtTime(0.18, now + 0.02);
+      gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.32);
+      osc.connect(gain).connect(ctx.destination);
+      osc.start(now);
+      osc.stop(now + 0.34);
+      osc.onended = () => { try { ctx.close(); } catch {} };
+    } catch {}
+  }, [insights]);
 
   const handlePickChartImage = useCallback(async () => {
     try {
       setScanError(null);
       setInsights(null);
+      setSignalAt(null);
       if (Platform.OS !== 'web') {
         const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
         if (status !== 'granted') {
@@ -103,21 +160,28 @@ export default function ScannerScreen() {
     }
   }, []);
 
+  // Pushes a freshly computed insight into state + fires reveal effects.
+  const commitInsights = useCallback((result: ChartInsights) => {
+    setInsights(result);
+    setScanError(null);
+    setSignalAt(Date.now());
+    setRevealCount(c => c + 1);
+  }, []);
+
   const revealWhenReady = useCallback((result: ChartInsights) => {
     const elapsed = Date.now() - scanStartedAtRef.current;
     const remaining = Math.max(0, scanTargetMsRef.current - elapsed);
     if (scanRevealTimerRef.current) clearTimeout(scanRevealTimerRef.current);
     scanRevealTimerRef.current = setTimeout(() => {
       scanRevealTimerRef.current = null;
-      setInsights(result);
-      setScanError(null);
+      commitInsights(result);
       setScanLoading(false);
     }, remaining);
-  }, []);
+  }, [commitInsights]);
 
   const handleScanChart = useCallback(async () => {
     if (!pickedImage) return;
-    const targetMs = 6000 + Math.floor(Math.random() * 4001); // 6–10s feel
+    const targetMs = 10000 + Math.floor(Math.random() * 10001); // 10–20s cinematic feel
     scanTargetMsRef.current = targetMs;
     scanStartedAtRef.current = Date.now();
     if (scanRevealTimerRef.current) {
@@ -127,6 +191,8 @@ export default function ScannerScreen() {
     setScanLoading(true);
     setScanError(null);
     setInsights(null);
+    setSignalAt(null);
+    setScanPhase(0);
     try {
       if (Platform.OS === 'web') {
         const result = await analyzeOnWeb(pickedImage.uri);
@@ -141,6 +207,7 @@ export default function ScannerScreen() {
       console.error('Scan chart error:', e);
       setScanError(e?.message || 'Failed to analyze chart. Please try again.');
       setScanLoading(false);
+      setScanPhase(-1);
     }
   }, [pickedImage, revealWhenReady]);
 
@@ -160,12 +227,27 @@ export default function ScannerScreen() {
       console.error('Analyzer message error:', e);
       setScanError(e?.message || 'Analyzer failed. Please try again.');
       setScanLoading(false);
+      setScanPhase(-1);
     } finally {
       setAnalyzerDataUri(null);
     }
   }, [revealWhenReady]);
 
+  const formatCountdown = (ms: number): string => {
+    const total = Math.max(0, Math.round(ms / 1000));
+    const mm = Math.floor(total / 60);
+    const ss = total % 60;
+    return `${String(mm).padStart(2, '0')}:${String(ss).padStart(2, '0')}`;
+  };
+
   const renderInsights = (data: ChartInsights) => {
+    const statRows: Array<{ label: string; value: string }> = [
+      { label: 'BIAS', value: data.bias === 'bullish' ? 'Bullish' : data.bias === 'bearish' ? 'Bearish' : 'Balanced' },
+      { label: 'STRUCTURE', value: data.trend === 'up' ? 'Uptrend' : data.trend === 'down' ? 'Downtrend' : 'Sideways range' },
+      { label: 'VOLATILITY', value: data.volatility.charAt(0).toUpperCase() + data.volatility.slice(1) },
+      { label: 'MOMENTUM', value: data.momentum.charAt(0).toUpperCase() + data.momentum.slice(1) },
+    ];
+
     const signalColor =
       data.signal.action === 'BUY' ? '#22C55E'
       : data.signal.action === 'SELL' ? '#EF4444'
@@ -185,20 +267,15 @@ export default function ScannerScreen() {
       : data.signal.strength === 'moderate' ? 2 : 1;
 
     const pulseOpacity = signalPulse.interpolate({ inputRange: [0, 1], outputRange: [0.35, 0.95] });
-
-    const stats: Array<{ label: string; value: string }> = [
-      { label: 'BIAS', value: data.bias === 'bullish' ? 'Bullish' : data.bias === 'bearish' ? 'Bearish' : 'Balanced' },
-      { label: 'STRUCTURE', value: data.trend === 'up' ? 'Uptrend' : data.trend === 'down' ? 'Downtrend' : 'Sideways' },
-      { label: 'VOLATILITY', value: data.volatility.charAt(0).toUpperCase() + data.volatility.slice(1) },
-      { label: 'MOMENTUM', value: data.momentum.charAt(0).toUpperCase() + data.momentum.slice(1) },
-    ];
+    const pulseScale = signalPulse.interpolate({ inputRange: [0, 1], outputRange: [1, 1.015] });
 
     return (
       <View style={{ gap: 14 }}>
-        <View
+        {/* ── Large signal hero with pulsing glow ─────────────────── */}
+        <Animated.View
           style={[
             styles.signalBox,
-            { backgroundColor: signalBg, borderColor: signalColor, shadowColor: signalColor },
+            { backgroundColor: signalBg, borderColor: signalColor, shadowColor: signalColor, transform: [{ scale: pulseScale }] },
             webGlow(signalColor, true),
           ]}
         >
@@ -207,9 +284,11 @@ export default function ScannerScreen() {
             style={[styles.signalPulse, { borderColor: signalColor, opacity: pulseOpacity }]}
           />
           <View style={styles.signalRow}>
-            <SignalIcon color={signalColor} size={42} strokeWidth={2.5} />
+            <SignalIcon color={signalColor} size={44} strokeWidth={2.5} />
             <View style={{ flex: 1 }}>
-              <Text style={[styles.signalHeadline, { color: signalColor }]}>{data.signal.headline}</Text>
+              <Text style={[styles.signalHeadline, { color: signalColor, textShadowColor: signalColor + 'B3' }]}>
+                {data.signal.headline}
+              </Text>
               <Text style={[styles.signalMeta, { color: signalColor + 'CC' }]}>
                 {data.signal.action === 'WAIT'
                   ? `${structureLabel} • ${data.volatility.toUpperCase()} VOL`
@@ -222,7 +301,8 @@ export default function ScannerScreen() {
                       key={i}
                       style={[
                         styles.strengthBar,
-                        { backgroundColor: i < strengthBars ? signalColor : signalColor + '26' },
+                        { backgroundColor: i < strengthBars ? signalColor : signalColor + '26', shadowColor: signalColor },
+                        i < strengthBars && webGlow(signalColor, true),
                       ]}
                     />
                   ))}
@@ -231,35 +311,67 @@ export default function ScannerScreen() {
             </View>
             <ConfidenceGauge value={data.confidence} color={signalColor} label="CONF" />
           </View>
+
+          <Typewriter
+            text={data.signal.rationale}
+            speed={14}
+            startDelay={120}
+            style={styles.signalRationale}
+          />
+
+          {/* Particle burst each time a new signal lands */}
+          <View pointerEvents="none" style={StyleSheet.absoluteFill}>
+            <ParticleBurst trigger={revealCount} color={signalColor} count={16} radius={150} />
+          </View>
+
+          {/* 15-minute freshness countdown */}
+          {signalAt && (
+            <View style={styles.countdownWrap}>
+              <View style={styles.countdownLabelRow}>
+                <Clock color={signalColor + 'CC'} size={12} strokeWidth={2.5} />
+                <Text style={[styles.countdownLabel, { color: signalColor + 'CC' }]}>
+                  SIGNAL FRESH FOR {formatCountdown(Math.max(0, SIGNAL_TTL_MS - (nowTick - signalAt)))}
+                </Text>
+              </View>
+              <View style={styles.countdownTrack}>
+                <View
+                  style={[
+                    styles.countdownFill,
+                    {
+                      backgroundColor: signalColor,
+                      width: `${Math.max(0, Math.min(100, 100 - ((nowTick - signalAt) / SIGNAL_TTL_MS) * 100))}%`,
+                    },
+                  ]}
+                />
+              </View>
+            </View>
+          )}
+        </Animated.View>
+
+        {/* ── Supporting diagnostics ───────────────────────────────── */}
+        <Text style={styles.resultText}>{data.summary}</Text>
+
+        <View style={styles.mixRow}>
+          <View style={[styles.mixBar, { flex: Math.max(1, data.bullishPercent), backgroundColor: '#22C55E' }]} />
+          <View style={[styles.mixBar, { flex: Math.max(1, data.bearishPercent), backgroundColor: '#EF4444' }]} />
+        </View>
+        <View style={styles.mixLabels}>
+          <Text style={styles.mixLabel}>{data.bullishPercent}% bullish</Text>
+          <Text style={styles.mixLabel}>{data.bearishPercent}% bearish</Text>
         </View>
 
-        <Text style={styles.summaryText}>{data.signal.rationale}</Text>
-
-        <View style={[styles.balanceBox, { borderColor: ac + '33' }]}>
-          <View style={styles.balanceRow}>
-            <Text style={[styles.balanceLabel, { color: '#22C55E' }]}>BULLISH</Text>
-            <Text style={styles.balanceValue}>{data.bullishPercent}%</Text>
-          </View>
-          <View style={styles.balanceBarTrack}>
-            <View style={[styles.balanceBarBull, { width: `${data.bullishPercent}%` }]} />
-          </View>
-          <View style={[styles.balanceRow, { marginTop: 10 }]}>
-            <Text style={[styles.balanceLabel, { color: '#EF4444' }]}>BEARISH</Text>
-            <Text style={styles.balanceValue}>{data.bearishPercent}%</Text>
-          </View>
-          <View style={styles.balanceBarTrack}>
-            <View style={[styles.balanceBarBear, { width: `${data.bearishPercent}%` }]} />
-          </View>
-        </View>
-
-        <View style={[styles.statsGrid, { borderColor: ac + '22' }]}>
-          {stats.map(s => (
-            <View key={s.label} style={styles.statCell}>
-              <Text style={styles.statLabel}>{s.label}</Text>
-              <Text style={styles.statValue}>{s.value}</Text>
+        <View style={{ gap: 8, marginTop: 4 }}>
+          {statRows.map(row => (
+            <View key={row.label} style={styles.resultRow}>
+              <Text style={[styles.resultLabel, { color: ac }]}>{row.label}</Text>
+              <Text style={styles.resultText}>{row.value}</Text>
             </View>
           ))}
         </View>
+
+        <Text style={styles.disclaimer}>
+          Descriptive chart diagnostics only — not financial advice or a trade recommendation.
+        </Text>
       </View>
     );
   };
@@ -277,6 +389,7 @@ export default function ScannerScreen() {
       <ScrollView style={{ flex: 1 }} contentContainerStyle={styles.body} keyboardShouldPersistTaps="handled">
         <Text style={styles.intro}>Drop your chart screenshot. Local analysis — no AI, no upload.</Text>
 
+        {/* Upload / Preview area */}
         <TouchableOpacity
           activeOpacity={0.85}
           onPress={handlePickChartImage}
@@ -292,6 +405,7 @@ export default function ScannerScreen() {
             </View>
           )}
 
+          {/* Detected horizontal levels — dashed lines over the preview */}
           {pickedImage && insights && insights.levels && insights.levels.length > 0 && (
             <View pointerEvents="none" style={StyleSheet.absoluteFill}>
               {insights.levels.map((ly, li) => {
@@ -315,6 +429,7 @@ export default function ScannerScreen() {
             </View>
           )}
 
+          {/* Scan-line sweep during analysis */}
           {scanLoading && pickedImage && (
             <>
               <View pointerEvents="none" style={styles.scanVeil} />
@@ -379,6 +494,7 @@ export default function ScannerScreen() {
         )}
       </ScrollView>
 
+      {/* Hidden native-only analyzer: renders the image on a canvas and posts back pixel stats. */}
       {Platform.OS !== 'web' && analyzerDataUri && (
         <WebView
           source={{ html: buildAnalyzerHtml(analyzerDataUri) }}
@@ -422,21 +538,21 @@ const styles = StyleSheet.create({
   dropzoneTitle: { fontSize: 13, fontWeight: '800', letterSpacing: 1.5, marginTop: 6 },
   dropzoneSub: { color: 'rgba(255,255,255,0.4)', fontSize: 11, letterSpacing: 0.3 },
   preview: { width: '100%', height: '100%' },
-  scanVeil: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.35)' },
+  scanVeil: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.25)' },
   scanLine: {
     position: 'absolute', left: 0, right: 0, top: 0, height: 2,
-    shadowOpacity: 0.9, shadowRadius: 8, shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 1, shadowRadius: 10, shadowOffset: { width: 0, height: 0 }, elevation: 8,
   },
   levelLine: {
-    position: 'absolute', left: 8, right: 8, height: 0,
-    borderTopWidth: 1.5, borderStyle: 'dashed' as any,
-    shadowOpacity: 0.7, shadowRadius: 6, shadowOffset: { width: 0, height: 0 },
+    position: 'absolute', left: 10, right: 10, height: 0,
+    borderTopWidth: 1, borderStyle: 'dashed' as any,
+    shadowOpacity: 0.7, shadowRadius: 8, shadowOffset: { width: 0, height: 0 },
   },
   levelTag: {
-    position: 'absolute', right: 0, top: -10, paddingHorizontal: 6, paddingVertical: 2,
+    position: 'absolute', left: 0, top: -8, paddingHorizontal: 6, paddingVertical: 2,
     borderRadius: 4,
   },
-  levelTagText: { color: '#000', fontSize: 9, fontWeight: '800', letterSpacing: 0.5 },
+  levelTagText: { color: '#000', fontSize: 9, fontWeight: '900', letterSpacing: 0.8 },
   actionsRow: { flexDirection: 'row', gap: 10 },
   secondaryBtn: {
     flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8,
@@ -451,56 +567,60 @@ const styles = StyleSheet.create({
   },
   primaryText: { fontSize: 12, fontWeight: '800', letterSpacing: 1.2 },
   phasesBox: {
-    borderRadius: 14, borderWidth: 1.25, padding: 16,
-    backgroundColor: 'rgba(10,10,12,0.7)', gap: 12,
+    borderRadius: 16, borderWidth: 1, padding: 16,
+    backgroundColor: '#080D1A', gap: 6,
   },
-  phasesHeader: { flexDirection: 'row', alignItems: 'center', gap: 10 },
-  phasesTitle: { fontSize: 12, fontWeight: '800', letterSpacing: 1.2 },
+  phasesHeader: { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 2 },
+  phasesTitle: { fontSize: 12, fontWeight: '800', letterSpacing: 1.6 },
   errorBox: {
     borderRadius: 12, borderWidth: 1.25, padding: 12,
     backgroundColor: 'rgba(255,77,77,0.08)',
   },
   errorText: { color: '#FF8080', fontSize: 12, letterSpacing: 0.3 },
   resultBox: {
-    borderRadius: 18, borderWidth: 1.5, padding: 16,
-    backgroundColor: 'rgba(10,10,12,0.7)', gap: 12,
+    borderRadius: 16, borderWidth: 1.5, padding: 16,
+    backgroundColor: '#080D1A', gap: 12,
   },
-  resultTitle: { fontSize: 12, fontWeight: '800', letterSpacing: 1.5, marginBottom: 4 },
+  resultTitle: { fontSize: 12, fontWeight: '800', letterSpacing: 1.6 },
+  resultRow: { gap: 2 },
+  resultLabel: { fontSize: 10, fontWeight: '700', letterSpacing: 1.2 },
+  resultText: { color: '#FFFFFF', fontSize: 13, fontWeight: '500', lineHeight: 18 },
   signalBox: {
-    borderRadius: 16, borderWidth: 1.75, padding: 16,
-    shadowOpacity: 0.6, shadowRadius: 12, shadowOffset: { width: 0, height: 0 },
-    overflow: 'hidden', position: 'relative',
+    position: 'relative', borderRadius: 20, borderWidth: 2,
+    paddingVertical: 20, paddingHorizontal: 20, gap: 14, overflow: 'hidden',
+    shadowOffset: { width: 0, height: 0 }, shadowOpacity: 0.6, shadowRadius: 20, elevation: 12,
   },
   signalPulse: {
     position: 'absolute', top: 4, left: 4, right: 4, bottom: 4,
-    borderRadius: 12, borderWidth: 1.5,
+    borderRadius: 16, borderWidth: 1,
   },
   signalRow: { flexDirection: 'row', alignItems: 'center', gap: 14 },
   signalHeadline: {
-    fontSize: 17, fontWeight: '900', letterSpacing: 0.4,
-    textShadowOffset: { width: 0, height: 0 }, textShadowRadius: 10,
+    fontSize: 32, fontWeight: '900', letterSpacing: 2,
+    textShadowOffset: { width: 0, height: 0 }, textShadowRadius: 12,
   },
-  signalMeta: { fontSize: 11, fontWeight: '700', letterSpacing: 0.8, marginTop: 4 },
-  strengthRow: { flexDirection: 'row', gap: 4, marginTop: 8 },
-  strengthBar: { width: 24, height: 4, borderRadius: 2 },
-  summaryText: { color: 'rgba(255,255,255,0.7)', fontSize: 12, lineHeight: 18, letterSpacing: 0.2 },
-  balanceBox: {
-    borderRadius: 12, borderWidth: 1, padding: 12,
-    backgroundColor: 'rgba(0,0,0,0.35)',
+  signalMeta: { marginTop: 3, fontSize: 11, fontWeight: '700', letterSpacing: 1.4 },
+  strengthRow: { flexDirection: 'row', gap: 5, marginTop: 10 },
+  strengthBar: {
+    width: 22, height: 6, borderRadius: 3,
+    shadowOffset: { width: 0, height: 0 }, shadowOpacity: 0.8, shadowRadius: 6, elevation: 4,
   },
-  balanceRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 },
-  balanceLabel: { fontSize: 10, fontWeight: '800', letterSpacing: 1 },
-  balanceValue: { color: '#FFFFFF', fontSize: 13, fontWeight: '700' },
-  balanceBarTrack: { height: 5, backgroundColor: 'rgba(255,255,255,0.06)', borderRadius: 3, overflow: 'hidden' },
-  balanceBarBull: { height: '100%', backgroundColor: '#22C55E' },
-  balanceBarBear: { height: '100%', backgroundColor: '#EF4444' },
-  statsGrid: {
-    flexDirection: 'row', flexWrap: 'wrap', gap: 8,
-    borderRadius: 12, borderWidth: 1, padding: 12,
-    backgroundColor: 'rgba(0,0,0,0.35)',
+  signalRationale: { color: 'rgba(255,255,255,0.9)', fontSize: 13, fontWeight: '500', lineHeight: 19 },
+  mixRow: {
+    flexDirection: 'row', height: 10, borderRadius: 5, overflow: 'hidden',
+    backgroundColor: 'rgba(255,255,255,0.06)',
   },
-  statCell: { width: '47%', gap: 4 },
-  statLabel: { color: 'rgba(255,255,255,0.4)', fontSize: 9, fontWeight: '700', letterSpacing: 1 },
-  statValue: { color: '#FFFFFF', fontSize: 13, fontWeight: '700' },
+  mixBar: { height: '100%' },
+  mixLabels: { flexDirection: 'row', justifyContent: 'space-between' },
+  mixLabel: { color: 'rgba(255,255,255,0.7)', fontSize: 11, fontWeight: '600', letterSpacing: 0.4 },
+  countdownWrap: { marginTop: 6, gap: 6 },
+  countdownLabelRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  countdownLabel: { fontSize: 10, fontWeight: '800', letterSpacing: 1.2 },
+  countdownTrack: { height: 4, borderRadius: 2, backgroundColor: 'rgba(255,255,255,0.1)', overflow: 'hidden' },
+  countdownFill: { height: '100%', borderRadius: 2 },
+  disclaimer: {
+    marginTop: 6, color: 'rgba(255,255,255,0.45)', fontSize: 10,
+    fontWeight: '500', fontStyle: 'italic', lineHeight: 14,
+  },
   hiddenWebView: { width: 1, height: 1, opacity: 0, position: 'absolute' },
 });
