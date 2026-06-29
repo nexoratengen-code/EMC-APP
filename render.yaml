@@ -14,4 +14,12 @@ services:
         value: "true"
       - key: EXPO_PUBLIC_API_BASE_URL
         value: "https://eamobileconnect.com/admin"
+      # ── Api2Trade MT5 (server-side only; never EXPO_PUBLIC_*) ──
+      - key: API2TRADE_BASE_URL
+        value: "https://mt5.mt4api.dev"
+      # Set these as secrets in the Render dashboard (sync:false = not committed).
+      - key: API2TRADE_USERNAME
+        sync: false
+      - key: API2TRADE_PASSWORD
+        sync: false
 

@@ -1,14 +1,16 @@
 import React, { useState, useCallback, useRef, useEffect } from 'react';
 import {
   View, Text, StyleSheet, TouchableOpacity, SafeAreaView, Platform,
-  Animated, Easing, Image, ScrollView, ActivityIndicator, Alert,
+  Animated, Easing, Image, ScrollView, ActivityIndicator, Alert, TextInput,
 } from 'react-native';
-import { ArrowLeft, Upload, Scan, RefreshCw, TrendingUp, TrendingDown, Minus, Clock } from 'lucide-react-native';
+import { ArrowLeft, Upload, Scan, RefreshCw, TrendingUp, TrendingDown, Minus, Clock, Zap } from 'lucide-react-native';
 import { router } from 'expo-router';
 import * as ImagePicker from 'expo-image-picker';
 import * as Haptics from 'expo-haptics';
 import { WebView } from 'react-native-webview';
 import { useTheme } from '@/providers/theme-provider';
+import { useApp } from '@/providers/app-provider';
+import { apiService } from '@/services/api';
 import { analyzeOnWeb, buildInsights, buildAnalyzerHtml, type ChartInsights } from '@/utils/chart-heuristics';
 import { ScanPhases } from '@/components/scan-phases';
 import { ConfidenceGauge } from '@/components/confidence-gauge';
@@ -27,6 +29,56 @@ export default function ScannerScreen() {
   const { theme } = useTheme();
   const ac = theme.accent;
   const a = theme.accentRgb;
+  const { mt5Account, executeManualTrade } = useApp();
+
+  // Auto-execute (from scan signal) inputs — lot/count optional, default 0.01 / 1
+  const [tradeSymbol, setTradeSymbol] = useState<string>('');
+  const [tradeLot, setTradeLot] = useState<string>('');
+  const [tradeCount, setTradeCount] = useState<string>('');
+  const [executing, setExecuting] = useState<boolean>(false);
+  const [execMsg, setExecMsg] = useState<{ ok: boolean; text: string } | null>(null);
+
+  // Broker symbol universe pulled from the connected Api2Trade account
+  const [symbolList, setSymbolList] = useState<string[]>([]);
+  const [symbolsLoading, setSymbolsLoading] = useState<boolean>(false);
+  const [symbolsError, setSymbolsError] = useState<string | null>(null);
+
+  // Pull symbols once an MT5 session is connected (cached for the session).
+  useEffect(() => {
+    let cancelled = false;
+    if (mt5Account?.uuid && symbolList.length === 0 && !symbolsLoading) {
+      setSymbolsLoading(true);
+      setSymbolsError(null);
+      apiService.getMT5Symbols(mt5Account.uuid)
+        .then((syms) => { if (!cancelled) setSymbolList(Array.isArray(syms) ? syms : []); })
+        .catch((e) => { if (!cancelled) setSymbolsError(e?.message || 'Could not load broker symbols'); })
+        .finally(() => { if (!cancelled) setSymbolsLoading(false); });
+    }
+    return () => { cancelled = true; };
+  }, [mt5Account?.uuid]);
+
+  const runExecute = useCallback(async (action: 'BUY' | 'SELL', symbolArg?: string) => {
+    if (executing) return;
+    const symbol = (symbolArg ?? tradeSymbol).trim();
+    setExecMsg(null);
+    if (!symbol) { setExecMsg({ ok: false, text: 'Pick or enter a symbol to trade.' }); return; }
+    if (symbolArg) setTradeSymbol(symbolArg);
+    setExecuting(true);
+    if (Platform.OS !== 'web') { try { await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium); } catch {} }
+    const res = await executeManualTrade({
+      symbol,
+      action,
+      lotSize: tradeLot.trim() || undefined,
+      numberOfTrades: tradeCount.trim() || undefined,
+    });
+    setExecuting(false);
+    if (res.ok) {
+      const lot = tradeLot.trim() || '0.01';
+      setExecMsg({ ok: true, text: `Executed ${res.placed} ${action} order${res.placed > 1 ? 's' : ''} on ${symbol.toUpperCase()} @ ${lot} lot via Api2Trade.` });
+    } else {
+      setExecMsg({ ok: false, text: res.error || 'Trade failed.' });
+    }
+  }, [executing, tradeSymbol, tradeLot, tradeCount, executeManualTrade]);
 
   const [pickedImage, setPickedImage] = useState<ImagePicker.ImagePickerAsset | null>(null);
   const [scanLoading, setScanLoading] = useState<boolean>(false);
@@ -39,6 +91,19 @@ export default function ScannerScreen() {
   const [signalAt, setSignalAt] = useState<number | null>(null);
   const [nowTick, setNowTick] = useState<number>(Date.now());
   const [revealCount, setRevealCount] = useState<number>(0);
+
+  // Auto-fire the pre-selected symbol the moment a scan resolves to BUY/SELL.
+  // Once per scan (keyed on signalAt). No symbol selected → analysis only.
+  // NOTE: must live below the signalAt/insights declarations (deps run at render).
+  const autoFiredAtRef = useRef<number | null>(null);
+  useEffect(() => {
+    if (!signalAt || !insights || autoFiredAtRef.current === signalAt) return;
+    autoFiredAtRef.current = signalAt;
+    const act = insights.signal.action;
+    if ((act === 'BUY' || act === 'SELL') && mt5Account?.uuid && tradeSymbol.trim()) {
+      runExecute(act, tradeSymbol.trim());
+    }
+  }, [signalAt, insights, mt5Account?.uuid, tradeSymbol, runExecute]);
 
   const scanLine = useRef(new Animated.Value(0)).current;
   const signalPulse = useRef(new Animated.Value(0)).current;
@@ -348,6 +413,31 @@ export default function ScannerScreen() {
           )}
         </Animated.View>
 
+        {/* ── Auto-execution status (setup lives at the top, pre-scan) ── */}
+        {data.signal.action !== 'WAIT' && (
+          <View style={[styles.execCard, { borderColor: signalColor + '55' }]}>
+            {executing ? (
+              <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
+                <ActivityIndicator color={signalColor} />
+                <Text style={[styles.execHintSmall, { color: signalColor }]}>Auto-executing {data.signal.action} on {(tradeSymbol.trim() || 'symbol').toUpperCase()}…</Text>
+              </View>
+            ) : execMsg ? (
+              <Text style={[styles.execMsg, { color: execMsg.ok ? '#22C55E' : '#EF4444' }]}>{execMsg.text}</Text>
+            ) : !mt5Account?.uuid ? (
+              <>
+                <Text style={styles.execHint}>Connect an MT5 account to auto-execute scans.</Text>
+                <TouchableOpacity style={[styles.execButton, { backgroundColor: ac }]} onPress={() => router.push('/metatrader')}>
+                  <Text style={styles.execButtonText}>CONNECT MT5</Text>
+                </TouchableOpacity>
+              </>
+            ) : !tradeSymbol.trim() ? (
+              <Text style={styles.execHint}>Pick a symbol in <Text style={{ color: signalColor, fontWeight: '800' }}>Trade Setup</Text> above — scanning auto-fires the {data.signal.action}. (Tap a symbol there to fire now.)</Text>
+            ) : (
+              <Text style={styles.execHintSmall}>Tap a symbol in Trade Setup above to fire {data.signal.action} again.</Text>
+            )}
+          </View>
+        )}
+
         {/* ── Supporting diagnostics ───────────────────────────────── */}
         <Text style={styles.resultText}>{data.summary}</Text>
 
@@ -389,6 +479,100 @@ export default function ScannerScreen() {
       <ScrollView style={{ flex: 1 }} contentContainerStyle={styles.body} keyboardShouldPersistTaps="handled">
         <Text style={styles.intro}>Drop your chart screenshot. Local analysis — no AI, no upload.</Text>
 
+        {/* ── Trade setup (set this FIRST; the scan auto-executes it) ── */}
+        <View style={[styles.execCard, { borderColor: ac + '55' }]}>
+          <View style={styles.execHeader}>
+            <Zap color={ac} size={15} strokeWidth={2.5} />
+            <Text style={[styles.execTitle, { color: ac }]}>TRADE SETUP</Text>
+          </View>
+          {!mt5Account?.uuid ? (
+            <>
+              <Text style={styles.execHint}>Connect an MT5 account to auto-execute scans. You can still scan for analysis without connecting.</Text>
+              <TouchableOpacity style={[styles.execButton, { backgroundColor: ac }]} onPress={() => router.push('/metatrader')}>
+                <Text style={styles.execButtonText}>CONNECT MT5</Text>
+              </TouchableOpacity>
+            </>
+          ) : (
+            <>
+              <View style={styles.execRow}>
+                <TextInput
+                  style={[styles.execInput, { flex: 1 }]}
+                  placeholder="Lot (0.01)"
+                  placeholderTextColor="#6B7280"
+                  keyboardType="decimal-pad"
+                  editable={!executing}
+                  value={tradeLot}
+                  onChangeText={setTradeLot}
+                />
+                <TextInput
+                  style={[styles.execInput, { flex: 1 }]}
+                  placeholder="Trades (1)"
+                  placeholderTextColor="#6B7280"
+                  keyboardType="number-pad"
+                  editable={!executing}
+                  value={tradeCount}
+                  onChangeText={setTradeCount}
+                />
+              </View>
+              <TextInput
+                style={[styles.execInput, { borderColor: ac + '99' }]}
+                placeholder={symbolsLoading ? 'Loading broker symbols…' : 'Search & pick the symbol you’re scanning'}
+                placeholderTextColor="#6B7280"
+                autoCapitalize="characters"
+                autoCorrect={false}
+                returnKeyType="go"
+                editable={!executing}
+                value={tradeSymbol}
+                onChangeText={setTradeSymbol}
+                onSubmitEditing={() => { const act = insights?.signal.action; if (act === 'BUY' || act === 'SELL') runExecute(act, tradeSymbol); }}
+              />
+              {symbolsLoading && (
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                  <ActivityIndicator color={ac} />
+                  <Text style={styles.execHintSmall}>Pulling symbols from your account…</Text>
+                </View>
+              )}
+              {symbolsError && (
+                <Text style={[styles.execHintSmall, { color: '#EF4444' }]}>{symbolsError} — you can still type a symbol manually.</Text>
+              )}
+              {symbolList.length > 0 && (() => {
+                const q = tradeSymbol.trim().toUpperCase();
+                const matches = (q ? symbolList.filter(s => s.toUpperCase().includes(q)) : symbolList).slice(0, 24);
+                return (
+                  <View style={styles.symbolChips}>
+                    {matches.map(sym => {
+                      const selected = tradeSymbol.trim().toUpperCase() === sym.toUpperCase();
+                      return (
+                        <TouchableOpacity
+                          key={sym}
+                          disabled={executing}
+                          style={[
+                            styles.symbolChip,
+                            { borderColor: ac + '55' },
+                            selected && { backgroundColor: ac + '22', borderColor: ac },
+                          ]}
+                          onPress={() => {
+                            setTradeSymbol(sym);
+                            const act = insights?.signal.action;
+                            if (act === 'BUY' || act === 'SELL') runExecute(act, sym);
+                          }}
+                        >
+                          <Text style={[styles.symbolChipText, { color: ac }]}>{sym}</Text>
+                        </TouchableOpacity>
+                      );
+                    })}
+                  </View>
+                );
+              })()}
+              {tradeSymbol.trim() ? (
+                <Text style={[styles.execHintSmall, { color: ac }]}>Selected {tradeSymbol.trim().toUpperCase()} — scanning will auto-execute it in the detected direction.</Text>
+              ) : (
+                <Text style={styles.execHintSmall}>Pick a symbol to auto-execute on scan, or leave blank to just analyze. Default 0.01 lot · 1 position.</Text>
+              )}
+            </>
+          )}
+        </View>
+
         {/* Upload / Preview area */}
         <TouchableOpacity
           activeOpacity={0.85}
@@ -402,30 +586,6 @@ export default function ScannerScreen() {
               <Upload color={ac} size={36} />
               <Text style={[styles.dropzoneTitle, { color: ac }]}>TAP TO UPLOAD CHART</Text>
               <Text style={styles.dropzoneSub}>PNG or JPG screenshot of your chart</Text>
-            </View>
-          )}
-
-          {/* Detected horizontal levels — dashed lines over the preview */}
-          {pickedImage && insights && insights.levels && insights.levels.length > 0 && (
-            <View pointerEvents="none" style={StyleSheet.absoluteFill}>
-              {insights.levels.map((ly, li) => {
-                const sc = insights.signal.action === 'BUY' ? '#22C55E'
-                  : insights.signal.action === 'SELL' ? '#EF4444' : '#9CA3AF';
-                return (
-                  <View
-                    key={`lvl-${li}`}
-                    style={[
-                      styles.levelLine,
-                      { top: `${Math.max(2, Math.min(98, ly * 100))}%`, borderColor: sc, shadowColor: sc },
-                      webGlow(sc, true),
-                    ]}
-                  >
-                    <View style={[styles.levelTag, { backgroundColor: sc + 'E6' }]}>
-                      <Text style={styles.levelTagText}>L{li + 1}</Text>
-                    </View>
-                  </View>
-                );
-              })}
             </View>
           )}
 
@@ -585,6 +745,46 @@ const styles = StyleSheet.create({
   resultRow: { gap: 2 },
   resultLabel: { fontSize: 10, fontWeight: '700', letterSpacing: 1.2 },
   resultText: { color: '#FFFFFF', fontSize: 13, fontWeight: '500', lineHeight: 18 },
+  execCard: {
+    borderWidth: 1,
+    borderRadius: 16,
+    padding: 14,
+    gap: 10,
+    backgroundColor: 'rgba(13,17,23,0.6)',
+  },
+  execHeader: { flexDirection: 'row', alignItems: 'center', gap: 7 },
+  execTitle: { fontSize: 12, fontWeight: '800', letterSpacing: 1 },
+  execHint: { color: '#9CA3AF', fontSize: 12, lineHeight: 17 },
+  execHintSmall: { color: '#6B7280', fontSize: 10, textAlign: 'center' },
+  execInput: {
+    backgroundColor: 'rgba(255,255,255,0.05)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.12)',
+    borderRadius: 12,
+    paddingHorizontal: 14,
+    paddingVertical: 11,
+    color: '#FFFFFF',
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  execRow: { flexDirection: 'row', gap: 10 },
+  execButton: {
+    borderRadius: 12,
+    paddingVertical: 13,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  execButtonText: { color: '#000000', fontSize: 13, fontWeight: '800', letterSpacing: 0.8 },
+  execMsg: { fontSize: 12, fontWeight: '600', lineHeight: 17 },
+  symbolChips: { flexDirection: 'row', flexWrap: 'wrap', gap: 7 },
+  symbolChip: {
+    borderWidth: 1,
+    borderRadius: 9,
+    paddingHorizontal: 11,
+    paddingVertical: 7,
+    backgroundColor: 'rgba(255,255,255,0.04)',
+  },
+  symbolChipText: { fontSize: 12, fontWeight: '700', letterSpacing: 0.4 },
   signalBox: {
     position: 'relative', borderRadius: 20, borderWidth: 2,
     paddingVertical: 20, paddingHorizontal: 20, gap: 14, overflow: 'hidden',

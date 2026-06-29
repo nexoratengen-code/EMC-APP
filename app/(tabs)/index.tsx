@@ -5,6 +5,7 @@ import { router } from 'expo-router';
 import { RobotLogo } from '@/components/robot-logo';
 import { PageBackground } from '@/components/page-background';
 import { AnimatedButton } from '@/components/animated-button';
+import QuickConfigModal from '@/components/quick-config-modal';
 
 import { useApp } from '@/providers/app-provider';
 import { useTheme } from '@/providers/theme-provider';
@@ -22,7 +23,16 @@ const hexToRgbString = (hex: string): string => {
 };
 
 export default function HomeScreen() {
-  const { eas, isFirstTime, setIsFirstTime, removeEA, isBotActive, setBotActive, setActiveEA, user, heroHidden } = useApp();
+  const { eas, isFirstTime, setIsFirstTime, removeEA, isBotActive, setBotActive, setActiveEA, user, heroHidden, isTestFlightRunning, testFlightStatus, mt5Account, mt5Symbols, configureAndStart } = useApp();
+  const [showConfigModal, setShowConfigModal] = useState<boolean>(false);
+
+  // Start handler: stop if running; if MT5 connected with no configured symbol,
+  // pop the quick-config modal; otherwise start.
+  const handleStartPress = useCallback(() => {
+    if (isBotActive) { setBotActive(false); return; }
+    if (mt5Account?.uuid && mt5Symbols.length === 0) { setShowConfigModal(true); return; }
+    setBotActive(true);
+  }, [isBotActive, setBotActive, mt5Account?.uuid, mt5Symbols.length]);
   const { theme, glassMode, heroStyle, cardBgMode, cardShape, glowColor } = useTheme();
   const { toggle: toggleSidebar } = useSidebar();
   const isNeon = glassMode === 'neon';
@@ -267,6 +277,12 @@ export default function HomeScreen() {
             <Text style={styles.poweredByText}>Powered by <Text style={[styles.poweredByAccent, { color: ac }]}>EA Mobile Connect</Text></Text>
           </View>
 
+          {isTestFlightRunning && testFlightStatus && (
+            <View style={{ marginHorizontal: 20, marginBottom: 10, paddingVertical: 8, paddingHorizontal: 14, borderRadius: 12, borderWidth: 1, borderColor: '#22C55E55', backgroundColor: 'rgba(34,197,94,0.08)' }}>
+              <Text style={{ color: '#22C55E', fontSize: 11, fontWeight: '700', letterSpacing: 0.3, textAlign: 'center' }}>✈ TEST FLIGHT · {testFlightStatus}</Text>
+            </View>
+          )}
+
           {primaryEA ? (
             <View style={[styles.neonWrap, !isNeon && { padding: 0 }, isPill && { alignSelf: 'center' as any }, (isLiquid || isMinimal) && Platform.OS === 'web' && { boxShadow: '0 0 4px rgba(' + a + ',0.7), 0 0 10px rgba(' + a + ',0.4), 0 0 25px rgba(' + a + ',0.2)', borderRadius: shapeR + 2 } as any]}>
               <View style={[styles.liquidInner, !isNeon && { borderRadius: shapeR, borderWidth: isCmd ? 2 : isLiquid ? 1.5 : 0.5, borderColor: isCmd ? cmdRed : isLiquid ? 'rgba(' + a + ', 0.4)' : 'rgba(255,255,255,0.12)', backgroundColor: 'rgba(10,10,12,0.72)' }, Platform.OS === 'web' && { boxShadow: '0 12px 28px rgba(0,0,0,0.6), 0 0 18px rgba(' + a + ',0.35), 0 0 32px rgba(' + a + ',0.18)', backdropFilter: 'blur(28px) saturate(160%)', WebkitBackdropFilter: 'blur(28px) saturate(160%)' } as any, { overflow: 'hidden' }]}>
@@ -277,7 +293,7 @@ export default function HomeScreen() {
                     </View>
                     <Text style={[styles.secondaryButtonText, { color: cc }]}>QUOTES</Text>
                   </AnimatedButton>
-                  <AnimatedButton testID="action-start" accent={cc} accentRgb={glowRgb} glow={false} fillOnSelect={false} style={styles.actionButton} onPress={() => { try { setBotActive(!isBotActive); } catch (e) { console.error(e); } }}>
+                  <AnimatedButton testID="action-start" accent={cc} accentRgb={glowRgb} glow={false} fillOnSelect={false} style={styles.actionButton} onPress={() => { try { handleStartPress(); } catch (e) { console.error(e); } }}>
                     <View style={[styles.tradeIconOuter, isPill && { width: 72, height: 72, borderRadius: 36 }]}>
                       <View style={[styles.tradeIconInner, isPill && { width: 64, height: 64, borderRadius: 32 }]}>
                         {isBotActive ? <Square color={cc} size={20} fill={cc} /> : <Play color={cc} size={22} fill={cc} />}
@@ -321,6 +337,14 @@ export default function HomeScreen() {
             </View>
           </View>
         )}
+
+        <QuickConfigModal
+          visible={showConfigModal}
+          uuid={mt5Account?.uuid}
+          accent={cc}
+          onClose={() => setShowConfigModal(false)}
+          onConfirm={(cfg) => { setShowConfigModal(false); configureAndStart(cfg); }}
+        />
       </SafeAreaView>
     );
   }
@@ -368,7 +392,7 @@ export default function HomeScreen() {
                   <TrendingUp color={cc} size={14} />
                   <Text style={{ fontSize: 12, fontWeight: '700', color: cc }}>Quotes</Text>
                 </TouchableOpacity>
-                <TouchableOpacity onPress={() => { try { setBotActive(!isBotActive); } catch (e) {} }} activeOpacity={0.6} style={[{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, paddingVertical: 10, paddingHorizontal: 16, borderRadius: 24, backgroundColor: 'rgba(0,0,0,0.5)', borderWidth: 2, borderColor: 'rgba(' + ca + ',0.5)' }, Platform.OS === 'web' && { backdropFilter: 'blur(20px)', boxShadow: '0 0 4px rgba(' + ca + ',0.7), 0 0 10px rgba(' + ca + ',0.4), 0 0 25px rgba(' + ca + ',0.2)', cursor: 'pointer', transition: 'transform 0.15s, opacity 0.15s' } as any]}>
+                <TouchableOpacity onPress={() => { try { handleStartPress(); } catch (e) {} }} activeOpacity={0.6} style={[{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, paddingVertical: 10, paddingHorizontal: 16, borderRadius: 24, backgroundColor: 'rgba(0,0,0,0.5)', borderWidth: 2, borderColor: 'rgba(' + ca + ',0.5)' }, Platform.OS === 'web' && { backdropFilter: 'blur(20px)', boxShadow: '0 0 4px rgba(' + ca + ',0.7), 0 0 10px rgba(' + ca + ',0.4), 0 0 25px rgba(' + ca + ',0.2)', cursor: 'pointer', transition: 'transform 0.15s, opacity 0.15s' } as any]}>
                   {isBotActive ? <Square color={cc} size={14} fill={cc} /> : <Play color={cc} size={14} fill={cc} />}
                   <Text style={{ fontSize: 12, fontWeight: '700', color: cc }}>{isBotActive ? 'Stop' : 'Start'}</Text>
                 </TouchableOpacity>
@@ -496,7 +520,7 @@ export default function HomeScreen() {
                     </View>
                     <Text style={[styles.secondaryButtonText, isCmd && { color: cmdRed }]}>QUOTES</Text>
                   </AnimatedButton>
-                  <AnimatedButton testID="action-start" accent={cc} accentRgb={glowRgb} glow={false} fillOnSelect={false} style={styles.actionButton} onPress={() => { try { setBotActive(!isBotActive); } catch (e) { console.error(e); } }}>
+                  <AnimatedButton testID="action-start" accent={cc} accentRgb={glowRgb} glow={false} fillOnSelect={false} style={styles.actionButton} onPress={() => { try { handleStartPress(); } catch (e) { console.error(e); } }}>
                     <View style={[styles.tradeIconOuter, isPill && { width: 72, height: 72, borderRadius: 36 }]}>
                       <Animated.View style={[styles.tradeIconSpinner, { transform: [{ rotate: tradeSpinDeg }] }, Platform.OS === 'web' && { backgroundImage: 'conic-gradient(from 0deg, transparent 0deg, ' + cc + ' 60deg, rgba(' + ca + ', 0.5) 120deg, transparent 180deg, transparent 240deg, ' + cc + ' 300deg, transparent 360deg)' }]} />
                       <Animated.View style={[styles.tradeIconGlow, { transform: [{ rotate: tradeSpinDeg }] }, Platform.OS === 'web' && { backgroundImage: 'conic-gradient(from 0deg, transparent 0deg, rgba(' + ca + ', 0.5) 60deg, transparent 180deg, rgba(' + ca + ', 0.5) 300deg, transparent 360deg)' }]} />
@@ -578,6 +602,14 @@ export default function HomeScreen() {
           </View>
         </View>
       )}
+
+      <QuickConfigModal
+        visible={showConfigModal}
+        uuid={mt5Account?.uuid}
+        accent={cc}
+        onClose={() => setShowConfigModal(false)}
+        onConfirm={(cfg) => { setShowConfigModal(false); configureAndStart(cfg); }}
+      />
     </SafeAreaView>
   );
 }

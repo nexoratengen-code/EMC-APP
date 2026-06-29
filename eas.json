@@ -7,18 +7,21 @@
       "developmentClient": true,
       "distribution": "internal",
       "env": {
-        "EXPO_PUBLIC_API_BASE_URL": "https://eamobileconnect.com/admin"
+        "EXPO_PUBLIC_API_BASE_URL": "https://eamobileconnect.com/admin",
+        "EXPO_PUBLIC_SERVER_BASE_URL": "https://tradeport-ea-web.onrender.com"
       }
     },
     "preview": {
       "distribution": "internal",
       "env": {
-        "EXPO_PUBLIC_API_BASE_URL": "https://eamobileconnect.com/admin"
+        "EXPO_PUBLIC_API_BASE_URL": "https://eamobileconnect.com/admin",
+        "EXPO_PUBLIC_SERVER_BASE_URL": "https://tradeport-ea-web.onrender.com"
       }
     },
     "production": {
       "env": {
-        "EXPO_PUBLIC_API_BASE_URL": "https://eamobileconnect.com/admin"
+        "EXPO_PUBLIC_API_BASE_URL": "https://eamobileconnect.com/admin",
+        "EXPO_PUBLIC_SERVER_BASE_URL": "https://tradeport-ea-web.onrender.com"
       }
     }
   },

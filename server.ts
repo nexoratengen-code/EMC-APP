@@ -1543,6 +1543,68 @@ async function handleApi(request: Request): Promise<Response> {
       return new Response('Method Not Allowed', { status: 405 });
     }
 
+    // ── Api2Trade MT5 routes ─────────────────────────────────
+    if (pathname === '/api/mt5/connect') {
+      const route = await import('./app/api/mt5/connect/route.ts');
+      if (request.method === 'POST' && typeof route.POST === 'function') {
+        return route.POST(request) as Promise<Response>;
+      }
+      if (request.method === 'DELETE' && typeof route.DELETE === 'function') {
+        return route.DELETE(request) as Promise<Response>;
+      }
+      return new Response('Method Not Allowed', { status: 405 });
+    }
+    if (pathname === '/api/mt5/account') {
+      const route = await import('./app/api/mt5/account/route.ts');
+      if (request.method === 'GET' && typeof route.GET === 'function') {
+        return route.GET(request) as Promise<Response>;
+      }
+      return new Response('Method Not Allowed', { status: 405 });
+    }
+    if (pathname === '/api/mt5/orders') {
+      const route = await import('./app/api/mt5/orders/route.ts');
+      if (request.method === 'GET' && typeof route.GET === 'function') {
+        return route.GET(request) as Promise<Response>;
+      }
+      return new Response('Method Not Allowed', { status: 405 });
+    }
+    if (pathname === '/api/mt5/trade') {
+      const route = await import('./app/api/mt5/trade/route.ts');
+      if (request.method === 'POST' && typeof route.POST === 'function') {
+        return route.POST(request) as Promise<Response>;
+      }
+      return new Response('Method Not Allowed', { status: 405 });
+    }
+    if (pathname === '/api/mt5/symbols') {
+      const route = await import('./app/api/mt5/symbols/route.ts');
+      if (request.method === 'GET' && typeof route.GET === 'function') {
+        return route.GET(request) as Promise<Response>;
+      }
+      return new Response('Method Not Allowed', { status: 405 });
+    }
+    // ── Server-side Test Flight (runs even when the app is closed) ──
+    if (pathname === '/api/mt5/testflight/start') {
+      const route = await import('./app/api/mt5/testflight/start/route.ts');
+      if (request.method === 'POST' && typeof route.POST === 'function') {
+        return route.POST(request) as Promise<Response>;
+      }
+      return new Response('Method Not Allowed', { status: 405 });
+    }
+    if (pathname === '/api/mt5/testflight/stop') {
+      const route = await import('./app/api/mt5/testflight/stop/route.ts');
+      if (request.method === 'POST' && typeof route.POST === 'function') {
+        return route.POST(request) as Promise<Response>;
+      }
+      return new Response('Method Not Allowed', { status: 405 });
+    }
+    if (pathname === '/api/mt5/testflight/status') {
+      const route = await import('./app/api/mt5/testflight/status/route.ts');
+      if (request.method === 'GET' && typeof route.GET === 'function') {
+        return route.GET(request) as Promise<Response>;
+      }
+      return new Response('Method Not Allowed', { status: 405 });
+    }
+
     return new Response('Not Found', { status: 404 });
   } catch (error) {
     console.error('API handler error:', error);

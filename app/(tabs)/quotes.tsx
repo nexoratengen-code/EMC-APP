@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { View, Text, StyleSheet, SafeAreaView, ScrollView, TouchableOpacity, ActivityIndicator, Alert, Animated, Platform, RefreshControl } from 'react-native';
+import { View, Text, StyleSheet, SafeAreaView, ScrollView, TouchableOpacity, ActivityIndicator, Alert, Animated, Platform, RefreshControl, TextInput } from 'react-native';
 import { ArrowLeft, Circle, RefreshCw } from 'lucide-react-native';
 import { router } from 'expo-router';
 import { useFocusEffect } from '@react-navigation/native';
@@ -32,7 +32,7 @@ const mockQuotes: Quote[] = [
 ];
 
 export default function QuotesScreen() {
-  const { eas, activeSymbols, mt4Symbols, mt5Symbols } = useApp();
+  const { eas, activeSymbols, mt4Symbols, mt5Symbols, mt5Account } = useApp();
   const { theme: thm, glassMode } = useTheme();
   const a = thm.accentRgb;
   const ac = thm.accent;
@@ -46,6 +46,9 @@ export default function QuotesScreen() {
   const [refreshing, setRefreshing] = useState<boolean>(false);
   const rotateAnim = useRef(new Animated.Value(0)).current;
   const [error, setError] = useState<string | null>(null);
+  const [query, setQuery] = useState<string>('');
+  // True when symbols are sourced from the connected Api2Trade account.
+  const fromBroker = !!mt5Account?.uuid;
 
   const primaryEA = eas.length > 0 ? eas[0] : null;
   const primaryEAImage = (() => {
@@ -66,6 +69,14 @@ export default function QuotesScreen() {
       mt5Symbols.some(mt5Symbol => mt5Symbol.symbol === quote.symbol)
   }));
 
+  // Search + render cap (broker symbol lists can be hundreds long)
+  const RENDER_CAP = 80;
+  const q = query.trim().toUpperCase();
+  const filteredQuotes = q
+    ? quotesWithActiveStatus.filter(qt => qt.symbol.toUpperCase().includes(q))
+    : quotesWithActiveStatus;
+  const visibleQuotes = filteredQuotes.slice(0, RENDER_CAP);
+
   // Fetch symbols from API when connected; fallback to mock offline
   const fetchSymbols = useCallback(async (showRefreshIndicator = false) => {
     try {
@@ -77,7 +88,13 @@ export default function QuotesScreen() {
       setError(null);
 
       let response: { data: ApiSymbol[] } = { data: [] };
-      if (hasConnectedEA && primaryEA?.phoneSecretKey) {
+      if (mt5Account?.uuid) {
+        // Pull the broker's full symbol universe from the connected Api2Trade account
+        const syms = await apiService.getMT5Symbols(mt5Account.uuid);
+        if (Array.isArray(syms)) {
+          response = { data: syms.map((name) => ({ name } as unknown as ApiSymbol)) };
+        }
+      } else if (hasConnectedEA && primaryEA?.phoneSecretKey) {
         const apiRes = await apiService.getSymbols(primaryEA.phoneSecretKey);
         if (apiRes.message === 'accept' && Array.isArray(apiRes.data)) {
           response = { data: apiRes.data };
@@ -150,7 +167,7 @@ export default function QuotesScreen() {
         setRefreshing(false);
       }, showRefreshIndicator ? 300 : 0);
     }
-  }, [hasConnectedEA, primaryEA?.phoneSecretKey, activeSymbols, mt4Symbols, mt5Symbols, quotes.length]);
+  }, [mt5Account?.uuid, hasConnectedEA, primaryEA?.phoneSecretKey, activeSymbols, mt4Symbols, mt5Symbols, quotes.length]);
 
   // Initial load and refresh when symbols change
   useEffect(() => {
@@ -167,7 +184,7 @@ export default function QuotesScreen() {
       // Gentle refresh to update the active status without disrupting the UI
       fetchSymbols(true);
     }
-  }, [hasConnectedEA, primaryEA?.phoneSecretKey, activeSymbols.length, mt4Symbols.length, mt5Symbols.length, quotes.length]);
+  }, [mt5Account?.uuid, hasConnectedEA, primaryEA?.phoneSecretKey, activeSymbols.length, mt4Symbols.length, mt5Symbols.length, quotes.length]);
 
   // Smooth rotation animation for refresh button
   useEffect(() => {
@@ -257,7 +274,7 @@ export default function QuotesScreen() {
           {apiSymbols.length > 0 && <Text style={styles.symbolCount}>{apiSymbols.length} symbols available</Text>}
         </View>
 
-        {hasConnectedEA && (
+        {(hasConnectedEA || fromBroker) && (
           <TouchableOpacity style={[styles.refreshButton, refreshing && styles.refreshButtonDisabled]} onPress={handleRefresh} disabled={refreshing} activeOpacity={refreshing ? 1 : 0.7}>
             <Animated.View style={{ transform: [{ rotate: rotateAnim.interpolate({ inputRange: [0, 1], outputRange: ['0deg', '360deg'] }) }] }}>
               <RefreshCw color={refreshing ? '#666666' : '#FFFFFF'} size={20} />
@@ -268,6 +285,17 @@ export default function QuotesScreen() {
 
       {/* Content */}
       <View style={styles.content}>
+        {!loading && !error && quotes.length > 0 && (fromBroker || quotes.length > 8) && (
+          <TextInput
+            style={styles.searchInput}
+            placeholder={fromBroker ? 'Search broker symbols…' : 'Search symbols…'}
+            placeholderTextColor="#6B7280"
+            autoCapitalize="characters"
+            autoCorrect={false}
+            value={query}
+            onChangeText={setQuery}
+          />
+        )}
         {loading && !refreshing ? (
           <View style={styles.loadingContainer}>
             <ActivityIndicator testID="quotes-loading" size="large" color={cc} />
@@ -288,13 +316,13 @@ export default function QuotesScreen() {
           </View>
         ) : (
           <ScrollView showsVerticalScrollIndicator={false} refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => fetchSymbols(true)} tintColor={cc} colors={[cc]} />}>
-            {quotesWithActiveStatus.length === 0 ? (
+            {filteredQuotes.length === 0 ? (
               <View style={styles.emptyContainer}>
-                <Text style={styles.emptyText}>No symbols available</Text>
-                <Text style={styles.emptySubtext}>Connect an EA to view trading symbols</Text>
+                <Text style={styles.emptyText}>{quotesWithActiveStatus.length === 0 ? 'No symbols available' : 'No symbols match your search'}</Text>
+                <Text style={styles.emptySubtext}>{quotesWithActiveStatus.length === 0 ? (fromBroker ? 'Could not load symbols from your account' : 'Connect an EA to view trading symbols') : 'Try a different search'}</Text>
               </View>
             ) : (
-              quotesWithActiveStatus.map((quote, index) => (
+              visibleQuotes.map((quote, index) => (
                 <TouchableOpacity
                   testID={`quote-item-${quote.symbol}`}
                   key={quote.symbol}
@@ -324,6 +352,9 @@ export default function QuotesScreen() {
                   </View>
                 </TouchableOpacity>
               ))
+            )}
+            {filteredQuotes.length > visibleQuotes.length && (
+              <Text style={styles.truncHint}>Showing {visibleQuotes.length} of {filteredQuotes.length} — search to narrow.</Text>
             )}
           </ScrollView>
         )}
@@ -361,6 +392,13 @@ const styles = StyleSheet.create({
   },
   refreshButtonDisabled: { backgroundColor: 'rgba(255, 255, 255, 0.03)' },
   symbolCount: { color: 'rgba(255,255,255,0.4)', fontSize: 10, fontWeight: '400', marginTop: 2 },
+  searchInput: {
+    backgroundColor: 'rgba(255,255,255,0.05)',
+    borderWidth: 1, borderColor: 'rgba(255,255,255,0.12)',
+    borderRadius: 14, paddingHorizontal: 16, paddingVertical: 12,
+    color: '#FFFFFF', fontSize: 15, fontWeight: '600', marginBottom: 14,
+  },
+  truncHint: { color: 'rgba(255,255,255,0.4)', fontSize: 12, textAlign: 'center', paddingVertical: 12 },
   loadingContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', paddingVertical: 60 },
   loadingText: { color: '#CCCCCC', fontSize: 16, marginTop: 16, fontWeight: '500' },
   errorContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', paddingVertical: 60, paddingHorizontal: 20 },

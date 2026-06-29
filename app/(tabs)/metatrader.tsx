@@ -8,6 +8,7 @@ import InjectableWebView from '../../components/injectable-webview';
 import FallbackWebView from '../../components/fallback-webview';
 import { Eye, EyeOff, Search, Server, ExternalLink, Shield, RefreshCw, X, Menu } from 'lucide-react-native';
 import { useApp } from '@/providers/app-provider';
+import { apiService } from '../../services/api';
 import { useTheme } from '@/providers/theme-provider';
 import { PageBackground } from '@/components/page-background';
 import { useSidebar } from '@/providers/sidebar-provider';
@@ -523,7 +524,7 @@ export default function MetaTraderScreen() {
   const fallbackSuccessRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const brokerFetchTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const authFinalizedRef = useRef<boolean>(false);
-  const { mtAccount, setMTAccount, mt4Account, setMT4Account, mt5Account, setMT5Account, eas } = useApp();
+  const { mtAccount, setMTAccount, mt4Account, setMT4Account, mt5Account, setMT5Account, clearMT5Account, eas } = useApp();
   const { theme: thm, glassMode } = useTheme();
   const { toggle: toggleSidebar } = useSidebar();
   const a = thm.accentRgb;
@@ -1803,15 +1804,86 @@ export default function MetaTraderScreen() {
     `;
   };
 
+  // MT5 (Api2Trade) connect — replaces the WebView path for the MT5 tab.
+  // Stores ONLY the uuid (plus login/server) client-side; the password is never persisted.
+  const handleConnectMT5 = async () => {
+    setIsAuthenticating(true);
+    setAuthenticationStep('Connecting to broker...');
+    try {
+      const result = await apiService.connectMT5({
+        server: server.trim(),
+        login: login.trim(),
+        password: password.trim(),
+        name: 'MT5 Account',
+      });
+
+      if (result?.uuid) {
+        setAuthenticationStep('Connected!');
+        // Persist ONLY the uuid (no password) for the Api2Trade path.
+        setMT5Account({
+          uuid: result.uuid,
+          login: login.trim(),
+          server: server.trim(),
+          connected: true,
+        });
+        setMTAccount({
+          type: 'MT5',
+          login: login.trim(),
+          server: server.trim(),
+          connected: true,
+        });
+        Alert.alert('Connected', 'Your MT5 account has been linked successfully.');
+      } else {
+        throw new Error((result as any)?.message || 'Connection failed');
+      }
+    } catch (error: any) {
+      const msg = error?.message || 'Failed to connect. Check your credentials.';
+      setMT5Account({
+        uuid: '',
+        login: login.trim(),
+        server: server.trim(),
+        connected: false,
+      });
+      setMTAccount({
+        type: 'MT5',
+        login: login.trim(),
+        server: server.trim(),
+        connected: false,
+      });
+      Alert.alert('Connection Failed', msg);
+    } finally {
+      setIsAuthenticating(false);
+      setAuthenticationStep('Initializing...');
+    }
+  };
+
+  // MT5 (Api2Trade) disconnect — tears down the server session and clears stored state.
+  const handleDisconnectMT5 = async () => {
+    const uuid = mt5Account?.uuid;
+    if (uuid) {
+      try {
+        await apiService.disconnectMT5(uuid);
+      } catch (_) {}
+    }
+    clearMT5Account();
+    setLogin('');
+    setPassword('');
+    setServer('');
+  };
+
   const handleLinkAccount = async () => {
     if (!login.trim() || !password.trim() || !server.trim()) {
       Alert.alert('Missing Information', 'Please fill in all fields to continue.');
       return;
     }
 
-    // Show web view based on active tab
     if (activeTab === 'MT5') {
-      handleMT5WebView();
+      // Already connected via Api2Trade -> treat the button as a disconnect action.
+      if (mt5Account?.uuid && mt5Account.connected) {
+        await handleDisconnectMT5();
+        return;
+      }
+      await handleConnectMT5();
     } else {
       handleMT4WebView();
     }
@@ -2035,6 +2107,11 @@ export default function MetaTraderScreen() {
                     <Shield color="#999999" size={16} />
                     <Text style={styles.linkButtonText}>LINK MT4 ACCOUNT DETAILS</Text>
                     <Text style={styles.comingSoonText}>COMING SOON</Text>
+                  </View>
+                ) : (mt5Account?.uuid && mt5Account.connected) ? (
+                  <View style={styles.buttonContent}>
+                    <Shield color="#FFFFFF" size={16} />
+                    <Text style={styles.linkButtonText}>DISCONNECT MT5 ACCOUNT</Text>
                   </View>
                 ) : (
                   <View style={styles.buttonContent}>

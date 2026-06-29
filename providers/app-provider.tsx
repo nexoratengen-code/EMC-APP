@@ -2,7 +2,7 @@ import createContextHook from '@nkzw/create-context-hook';
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Platform, Alert } from 'react-native';
-import { LicenseData } from '@/services/api';
+import { LicenseData, apiService } from '@/services/api';
 import signalsMonitor, { SignalLog } from '@/services/signals-monitor';
 import databaseSignalsPollingService, { DatabaseSignal } from '@/services/database-signals-polling';
 import { mqttSignalsService } from '@/services/mqtt-signals';
@@ -37,10 +37,13 @@ export interface MT4Account {
 }
 
 export interface MT5Account {
-  login: string;
-  password: string;
+  login?: string;
+  password?: string;
   server: string;
   connected: boolean;
+  /** Api2Trade MT5 session UUID. When present, signals for MT5 symbols are
+   *  routed through Api2Trade (apiService.sendMT5Trade) instead of the WebView. */
+  uuid?: string;
 }
 
 export interface ActiveSymbol {
@@ -95,6 +98,11 @@ interface AppState {
   setMTAccount: (account: MTAccount) => void;
   setMT4Account: (account: MT4Account) => void;
   setMT5Account: (account: MT5Account) => void;
+  clearMT5Account: () => void;
+  executeManualTrade: (params: { symbol: string; action: 'BUY' | 'SELL'; lotSize?: string; numberOfTrades?: string }) => Promise<{ ok: boolean; placed: number; error?: string }>;
+  isTestFlightRunning: boolean;
+  testFlightStatus: string | null;
+  configureAndStart: (config: Omit<MT5Symbol, 'activatedAt'>) => Promise<void>;
   setIsFirstTime: (isFirstTime: boolean) => void;
   activateSymbol: (symbolConfig: Omit<ActiveSymbol, 'activatedAt'>) => void;
   activateMT4Symbol: (symbolConfig: Omit<MT4Symbol, 'activatedAt'>) => void;
@@ -498,6 +506,16 @@ export const [AppProvider, useApp] = createContextHook<AppState>(() => {
     }
   }, []);
 
+  const clearMT5Account = useCallback(async () => {
+    setMT5AccountState(null);
+    try {
+      await AsyncStorage.removeItem('mt5Account');
+      console.log('MT5 account cleared');
+    } catch (error) {
+      console.error('Error clearing MT5 account:', error);
+    }
+  }, []);
+
   const setIsFirstTime = useCallback(async (value: boolean) => {
     setIsFirstTimeState(value);
     try {
@@ -690,8 +708,226 @@ export const [AppProvider, useApp] = createContextHook<AppState>(() => {
     }
   }, []);
 
+  // ── Api2Trade auto-trade routing ──
+  // When an MT5 Api2Trade session is connected (mt5Account.uuid present), MT5
+  // signals are placed directly through apiService.sendMT5Trade instead of the
+  // trading WebView. MT4 — and any case where there's no uuid or the API call
+  // fails — falls back to the existing WebView path (setTradingSignal +
+  // setShowTradingWebView), which is left completely intact.
+  const executeViaApi2Trade = useCallback(async (
+    signal: SignalLog,
+    symbolConfig: { lotSize: string; direction: 'BUY' | 'SELL' | 'BOTH'; numberOfTrades: string },
+  ): Promise<boolean> => {
+    if (!mt5Account?.uuid) return false;
+
+    let action = (signal.action || '').toUpperCase();
+    if (symbolConfig.direction === 'BUY') action = 'BUY';
+    else if (symbolConfig.direction === 'SELL') action = 'SELL';
+    if (action !== 'BUY' && action !== 'SELL') {
+      console.warn('[Api2Trade] Unresolved trade direction for signal:', signal.asset, signal.action);
+      return false;
+    }
+
+    const volume = parseFloat(symbolConfig.lotSize) || 0.01;
+    const count = parseInt(symbolConfig.numberOfTrades, 10) || 1;
+    const operation: 'Buy' | 'Sell' = action === 'BUY' ? 'Buy' : 'Sell';
+
+    console.log(`[Api2Trade] Firing ${count}x ${operation} ${signal.asset} @ ${volume} lots via API`);
+
+    try {
+      for (let i = 0; i < count; i++) {
+        await apiService.sendMT5Trade({
+          id: mt5Account.uuid,
+          action: 'open',
+          symbol: signal.asset,
+          operation,
+          volume,
+        });
+        console.log(`[Api2Trade] Order ${i + 1}/${count} placed`);
+      }
+      console.log(`[Api2Trade] All ${count} order(s) executed for ${signal.asset}`);
+      return true;
+    } catch (e: any) {
+      console.error('[Api2Trade] Trade failed:', e?.message || e);
+      return false;
+    }
+  }, [mt5Account?.uuid]);
+
+  const tryApi2TradeOrWebView = useCallback(async (
+    signal: SignalLog,
+    symbolConfig?: { lotSize: string; direction: 'BUY' | 'SELL' | 'BOTH'; numberOfTrades: string },
+  ) => {
+    const symbolName = (signal.asset || '').toUpperCase();
+    const mt5Config = symbolConfig
+      || mt5Symbols.find(s => s.symbol.toUpperCase() === symbolName);
+    const isMT5 = !!mt5Symbols.find(s => s.symbol.toUpperCase() === symbolName) || !!symbolConfig;
+
+    // Route through Api2Trade only when we have a connected MT5 session and the
+    // signal targets an MT5-platform symbol. Everything else (MT4, legacy, no
+    // uuid) keeps the existing WebView behavior.
+    if (mt5Account?.uuid && isMT5 && mt5Config) {
+      const ok = await executeViaApi2Trade(signal, mt5Config);
+      if (ok) {
+        console.log('[Api2Trade] Signal executed via API — no WebView needed');
+        return;
+      }
+      console.warn('[Api2Trade] API trade failed — falling back to WebView');
+    }
+
+    // Existing WebView path (unchanged behavior for MT4 / no-uuid / fallback).
+    setTradingSignal(signal);
+    setShowTradingWebView(true);
+  }, [mt5Account?.uuid, mt5Symbols, executeViaApi2Trade]);
+
+  // ── Manual / scanner-driven trade ──
+  // Fires N market orders for a user-entered symbol directly through the
+  // connected Api2Trade MT5 session. Defaults: 0.01 lot, 1 position.
+  const executeManualTrade = useCallback(async (
+    params: { symbol: string; action: 'BUY' | 'SELL'; lotSize?: string; numberOfTrades?: string },
+  ): Promise<{ ok: boolean; placed: number; error?: string }> => {
+    // Use the broker's EXACT symbol (e.g. "XAUUSD.mic") — do NOT uppercase,
+    // the broker's symbols are case-sensitive and OrderSend silently fails otherwise.
+    const symbol = (params.symbol || '').trim();
+    if (!symbol) return { ok: false, placed: 0, error: 'Enter a symbol to trade.' };
+    if (!mt5Account?.uuid) return { ok: false, placed: 0, error: 'Connect an MT5 account first (MetaTrader tab).' };
+    if (params.action !== 'BUY' && params.action !== 'SELL') {
+      return { ok: false, placed: 0, error: 'No clear trade direction from this scan.' };
+    }
+
+    const volume = parseFloat(params.lotSize ?? '') || 0.01;
+    const count = Math.max(1, parseInt(params.numberOfTrades ?? '', 10) || 1);
+    const operation: 'Buy' | 'Sell' = params.action === 'BUY' ? 'Buy' : 'Sell';
+
+    console.log(`[Api2Trade] Manual: firing ${count}x ${operation} ${symbol} @ ${volume} lots`);
+    let placed = 0;
+    let lastErr: string | undefined;
+    try {
+      for (let i = 0; i < count; i++) {
+        const order: any = await apiService.sendMT5Trade({ id: mt5Account.uuid, action: 'open', symbol, operation, volume });
+        // A real fill returns a positive ticket. Anything else = broker rejected it
+        // (bad symbol, market closed, no margin) — surface it instead of faking success.
+        if (order && typeof order.ticket === 'number' && order.ticket > 0) {
+          placed += 1;
+          console.log(`[Api2Trade] Order ${placed}/${count} filled — ticket ${order.ticket} (${symbol})`);
+        } else {
+          lastErr = order?.error || order?.message || `Broker rejected ${symbol} (no ticket returned). Check the exact symbol name and that the market is open.`;
+          console.warn('[Api2Trade] OrderSend returned no ticket:', order);
+          break; // stop hammering if the broker is rejecting
+        }
+      }
+      if (placed === 0) return { ok: false, placed, error: lastErr || 'No orders were placed.' };
+      return { ok: true, placed, error: lastErr };
+    } catch (e: any) {
+      console.error('[Api2Trade] Manual trade failed:', e?.message || e);
+      return { ok: placed > 0, placed, error: e?.message || 'Trade request failed.' };
+    }
+  }, [mt5Account?.uuid]);
+
+  // ── TEST FLIGHT (Api2Trade, SERVER-SIDE) ──
+  // The open→hold 10m→close & reverse loop runs on the BACKEND, so it keeps
+  // trading even when the iOS app is backgrounded or fully closed. The app just
+  // starts/stops it and polls status to reflect what the server is doing.
+  const [testFlightStatus, setTestFlightStatus] = useState<string | null>(null);
+  const [isTestFlightRunning, setIsTestFlightRunning] = useState<boolean>(false);
+  const testFlightPollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  const refreshTestFlight = useCallback(async (): Promise<boolean> => {
+    const uuid = mt5Account?.uuid;
+    if (!uuid) return false;
+    try {
+      const st: any = await apiService.getTestFlightStatus(uuid);
+      if (st?.running) {
+        setIsTestFlightRunning(true);
+        setTestFlightStatus(st.status || `${String(st.dir || '').toUpperCase()} ${st.symbol} x${st.openTickets} open`);
+        return true;
+      }
+      setIsTestFlightRunning(false);
+      setTestFlightStatus(null);
+      return false;
+    } catch { return false; }
+  }, [mt5Account?.uuid]);
+
+  const ensureTestFlightPolling = useCallback(() => {
+    if (testFlightPollRef.current) return;
+    testFlightPollRef.current = setInterval(async () => {
+      const running = await refreshTestFlight();
+      if (!running && testFlightPollRef.current) { clearInterval(testFlightPollRef.current); testFlightPollRef.current = null; }
+    }, 5000);
+  }, [refreshTestFlight]);
+
+  const stopTestFlight = useCallback(async () => {
+    const uuid = mt5Account?.uuid;
+    if (testFlightPollRef.current) { clearInterval(testFlightPollRef.current); testFlightPollRef.current = null; }
+    setIsTestFlightRunning(false);
+    setTestFlightStatus(null);
+    if (uuid) {
+      try { await apiService.stopTestFlight(uuid); console.log('[TestFlight] stop requested (server)'); }
+      catch (e: any) { console.error('[TestFlight] stop error:', e?.message || e); }
+    }
+  }, [mt5Account?.uuid]);
+
+  const startTestFlight = useCallback((override?: { symbol: string; lotSize: string; numberOfTrades: string }): boolean => {
+    const uuid = mt5Account?.uuid;
+    // Prefer an explicit config (quick-config popup), else the MOST-RECENTLY
+    // activated MT5 symbol + its SAVED lot/number-of-trades.
+    const cfg = override ?? [...mt5SymbolsRef.current].sort((x, y) => {
+      const tx = x.activatedAt instanceof Date ? x.activatedAt.getTime() : new Date(x.activatedAt as unknown as string).getTime();
+      const ty = y.activatedAt instanceof Date ? y.activatedAt.getTime() : new Date(y.activatedAt as unknown as string).getTime();
+      return (ty || 0) - (tx || 0);
+    })[0];
+    if (!uuid || !cfg) return false;
+    const symbol = cfg.symbol;
+    const volume = parseFloat(cfg.lotSize ?? '0.01') || 0.01;
+    const count = Math.max(1, parseInt(cfg.numberOfTrades ?? '1', 10) || 1);
+    console.log(`[TestFlight] Starting SERVER loop — ${symbol} x${count} @ ${volume}, reverse every 10m`);
+    setIsTestFlightRunning(true);
+    setTestFlightStatus(`Starting ${symbol} x${count} @ ${volume}…`);
+    apiService.startTestFlight(uuid, { symbol, volume, count, intervalMinutes: 10 })
+      .then(() => { refreshTestFlight(); ensureTestFlightPolling(); })
+      .catch((e: any) => { setTestFlightStatus(`Start failed: ${e?.message || e}`); setIsTestFlightRunning(false); });
+    return true;
+  }, [mt5Account?.uuid, refreshTestFlight, ensureTestFlightPolling]);
+
+  // Restore on app open: if the server already has a flight running, reflect it
+  // (close & reopen the app → the loop is still going on the backend).
+  useEffect(() => {
+    if (mt5Account?.uuid) {
+      refreshTestFlight().then((running) => { if (running) ensureTestFlightPolling(); });
+    }
+  }, [mt5Account?.uuid, refreshTestFlight, ensureTestFlightPolling]);
+
+  // Quick-config from the Start popup: save the symbol config AND start immediately.
+  // Passes the config straight to startTestFlight to avoid a stale-ref race.
+  const configureAndStart = useCallback(async (config: Omit<MT5Symbol, 'activatedAt'>) => {
+    if (!mt5Account?.uuid) { Alert.alert('Connect MT5 first', 'Connect an MT5 account before starting.'); return; }
+    activateMT5Symbol(config); // persist + surface in Quotes/trade-config
+    setIsBotActive(true);
+    try { await AsyncStorage.setItem('isBotActive', JSON.stringify(true)); } catch {}
+    startTestFlight({ symbol: config.symbol, lotSize: config.lotSize, numberOfTrades: config.numberOfTrades });
+  }, [mt5Account?.uuid, activateMT5Symbol, startTestFlight]);
+
   const setBotActive = useCallback(async (active: boolean) => {
     console.log('setBotActive called with:', active);
+
+    // ── Api2Trade TEST-FLIGHT mode ──
+    // When an MT5 session is connected, Start runs the open→30s→close&reverse
+    // loop on the activated symbol instead of WebView signal polling.
+    if (mt5Account?.uuid) {
+      if (active) {
+        if (mt5SymbolsRef.current.length === 0) {
+          Alert.alert('Set a symbol first', 'Open Quotes, tap a symbol to activate it, then press Start to run the test flight.');
+          return;
+        }
+        setIsBotActive(true);
+        try { await AsyncStorage.setItem('isBotActive', JSON.stringify(true)); } catch {}
+        startTestFlight();
+      } else {
+        setIsBotActive(false);
+        try { await AsyncStorage.setItem('isBotActive', JSON.stringify(false)); } catch {}
+        await stopTestFlight();
+      }
+      return;
+    }
 
     // If activating on Android, request overlay permission
     if (active && Platform.OS === 'android') {
@@ -761,8 +997,9 @@ export const [AppProvider, useApp] = createContextHook<AppState>(() => {
 
             if (isActiveInLegacy || isActiveInMT4 || isActiveInMT5) {
               console.log('✅ Database signal — TRIGGERING TRADE:', symbolName, signal.action);
-              setTradingSignal(signalLog);
-              setShowTradingWebView(true);
+              // MT5 signals with an Api2Trade session route through the API;
+              // MT4 / legacy / no-uuid fall back to the existing WebView path.
+              tryApi2TradeOrWebView(signalLog);
             } else {
               console.log('⚠️ Database signal received but symbol not in active list:', symbolName);
             }
@@ -805,7 +1042,7 @@ export const [AppProvider, useApp] = createContextHook<AppState>(() => {
       // Revert state on error
       setIsBotActive(!active);
     }
-  }, [requestOverlayPermission, eas]);
+  }, [requestOverlayPermission, eas, tryApi2TradeOrWebView, mt5Account?.uuid, startTestFlight, stopTestFlight]);
 
   const startSignalsMonitoring = useCallback((phoneSecret: string) => {
     console.log('Starting signals monitoring with phone secret:', phoneSecret);
@@ -838,11 +1075,10 @@ export const [AppProvider, useApp] = createContextHook<AppState>(() => {
       });
 
       if (isActiveInLegacy || isActiveInMT4 || isActiveInMT5) {
-        console.log('✅ Signal is for active symbol, triggering trading WebView:', symbolName);
-        console.log('Setting trading signal:', signal);
-        console.log('Setting showTradingWebView to true');
-        setTradingSignal(signal);
-        setShowTradingWebView(true);
+        console.log('✅ Signal is for active symbol, triggering trade:', symbolName);
+        // MT5 signals with an Api2Trade session route through the API;
+        // MT4 / legacy / no-uuid fall back to the existing WebView path.
+        tryApi2TradeOrWebView(signal);
       } else {
         console.log('❌ Signal ignored - not for active symbol:', symbolName);
       }
@@ -854,7 +1090,7 @@ export const [AppProvider, useApp] = createContextHook<AppState>(() => {
 
     signalsMonitor.startMonitoring(phoneSecret, onSignalReceived, onError);
     setIsSignalsMonitoring(true);
-  }, [activeSymbols, mt4Symbols, mt5Symbols]);
+  }, [activeSymbols, mt4Symbols, mt5Symbols, tryApi2TradeOrWebView]);
 
   const stopSignalsMonitoring = useCallback(() => {
     console.log('Stopping signals monitoring');
@@ -953,6 +1189,11 @@ export const [AppProvider, useApp] = createContextHook<AppState>(() => {
     setMTAccount,
     setMT4Account,
     setMT5Account,
+    clearMT5Account,
+    executeManualTrade,
+    isTestFlightRunning,
+    testFlightStatus,
+    configureAndStart,
     setIsFirstTime,
     activateSymbol,
     activateMT4Symbol,
@@ -970,5 +1211,5 @@ export const [AppProvider, useApp] = createContextHook<AppState>(() => {
     setShowTradingWebView: setShowTradingWebViewCallback,
     heroHidden,
     setHeroHidden,
-  }), [user, eas, mtAccount, mt4Account, mt5Account, isFirstTime, activeSymbols, mt4Symbols, mt5Symbols, isBotActive, signalLogs, isSignalsMonitoring, newSignal, tradingSignal, showTradingWebView, databaseSignal, isDatabaseSignalsPolling, setUser, addEA, removeEA, setActiveEA, setMTAccount, setMT4Account, setMT5Account, setIsFirstTime, activateSymbol, activateMT4Symbol, activateMT5Symbol, deactivateSymbol, deactivateMT4Symbol, deactivateMT5Symbol, setBotActive, requestOverlayPermission, startSignalsMonitoring, stopSignalsMonitoring, clearSignalLogs, dismissNewSignal, setTradingSignalCallback, setShowTradingWebViewCallback, heroHidden, setHeroHidden]);
+  }), [user, eas, mtAccount, mt4Account, mt5Account, isFirstTime, activeSymbols, mt4Symbols, mt5Symbols, isBotActive, signalLogs, isSignalsMonitoring, newSignal, tradingSignal, showTradingWebView, databaseSignal, isDatabaseSignalsPolling, setUser, addEA, removeEA, setActiveEA, setMTAccount, setMT4Account, setMT5Account, clearMT5Account, executeManualTrade, isTestFlightRunning, testFlightStatus, configureAndStart, setIsFirstTime, activateSymbol, activateMT4Symbol, activateMT5Symbol, deactivateSymbol, deactivateMT4Symbol, deactivateMT5Symbol, setBotActive, requestOverlayPermission, startSignalsMonitoring, stopSignalsMonitoring, clearSignalLogs, dismissNewSignal, setTradingSignalCallback, setShowTradingWebViewCallback, heroHidden, setHeroHidden]);
 });
