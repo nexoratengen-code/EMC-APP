@@ -26,13 +26,14 @@ export default function HomeScreen() {
   const { eas, isFirstTime, setIsFirstTime, removeEA, isBotActive, setBotActive, setActiveEA, user, heroHidden, isTestFlightRunning, testFlightStatus, mt5Account, mt5Symbols, configureAndStart } = useApp();
   const [showConfigModal, setShowConfigModal] = useState<boolean>(false);
 
-  // Start handler: stop if running; if MT5 connected with no configured symbol,
-  // pop the quick-config modal; otherwise start.
+  // Start handler: stop if running; require a connected MT5 account (else send
+  // the user to MetaTrader to connect); when connected, ALWAYS pop the
+  // quick-config modal (pick/confirm symbol + lot + trades each run).
   const handleStartPress = useCallback(() => {
     if (isBotActive) { setBotActive(false); return; }
-    if (mt5Account?.uuid && mt5Symbols.length === 0) { setShowConfigModal(true); return; }
-    setBotActive(true);
-  }, [isBotActive, setBotActive, mt5Account?.uuid, mt5Symbols.length]);
+    if (!mt5Account?.uuid) { router.push('/metatrader'); return; }
+    setShowConfigModal(true);
+  }, [isBotActive, setBotActive, mt5Account?.uuid]);
   const { theme, glassMode, heroStyle, cardBgMode, cardShape, glowColor } = useTheme();
   const { toggle: toggleSidebar } = useSidebar();
   const isNeon = glassMode === 'neon';

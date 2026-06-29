@@ -340,7 +340,7 @@ class ApiService {
   }
 
   // ── Server-side Test Flight (runs even when the app is closed) ──
-  async startTestFlight(uuid: string, opts: { symbol: string; volume: number; count: number; intervalMinutes: number }): Promise<any> {
+  async startTestFlight(uuid: string, opts: { symbol: string; volume: number; count: number; intervalMinutes: number; comment?: string }): Promise<any> {
     const res = await fetch(`${this.getServerBase()}/api/mt5/testflight/start`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },

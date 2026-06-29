@@ -103,6 +103,7 @@ interface AppState {
   isTestFlightRunning: boolean;
   testFlightStatus: string | null;
   configureAndStart: (config: Omit<MT5Symbol, 'activatedAt'>) => Promise<void>;
+  stopTestFlight: () => Promise<void>;
   setIsFirstTime: (isFirstTime: boolean) => void;
   activateSymbol: (symbolConfig: Omit<ActiveSymbol, 'activatedAt'>) => void;
   activateMT4Symbol: (symbolConfig: Omit<MT4Symbol, 'activatedAt'>) => void;
@@ -146,11 +147,16 @@ export const [AppProvider, useApp] = createContextHook<AppState>(() => {
   const mt5SymbolsRef = useRef<MT5Symbol[]>([]);
   const mt4AccountRef = useRef<MT4Account | null>(null);
   const mt5AccountRef = useRef<MT5Account | null>(null);
+  const easRef = useRef<EA[]>([]);
   useEffect(() => { activeSymbolsRef.current = activeSymbols; }, [activeSymbols]);
   useEffect(() => { mt4SymbolsRef.current = mt4Symbols; }, [mt4Symbols]);
   useEffect(() => { mt5SymbolsRef.current = mt5Symbols; }, [mt5Symbols]);
   useEffect(() => { mt4AccountRef.current = mt4Account; }, [mt4Account]);
   useEffect(() => { mt5AccountRef.current = mt5Account; }, [mt5Account]);
+  useEffect(() => { easRef.current = eas; }, [eas]);
+
+  // Robot/EA name stamped as the comment on every order it places.
+  const robotName = (): string => (easRef.current[0]?.name || 'EA Mobile Connect').slice(0, 31);
 
   // Load persisted data on mount
   useEffect(() => {
@@ -742,6 +748,7 @@ export const [AppProvider, useApp] = createContextHook<AppState>(() => {
           symbol: signal.asset,
           operation,
           volume,
+          comment: robotName(),
         });
         console.log(`[Api2Trade] Order ${i + 1}/${count} placed`);
       }
@@ -803,7 +810,7 @@ export const [AppProvider, useApp] = createContextHook<AppState>(() => {
     let lastErr: string | undefined;
     try {
       for (let i = 0; i < count; i++) {
-        const order: any = await apiService.sendMT5Trade({ id: mt5Account.uuid, action: 'open', symbol, operation, volume });
+        const order: any = await apiService.sendMT5Trade({ id: mt5Account.uuid, action: 'open', symbol, operation, volume, comment: robotName() });
         // A real fill returns a positive ticket. Anything else = broker rejected it
         // (bad symbol, market closed, no margin) — surface it instead of faking success.
         if (order && typeof order.ticket === 'number' && order.ticket > 0) {
@@ -882,7 +889,7 @@ export const [AppProvider, useApp] = createContextHook<AppState>(() => {
     console.log(`[TestFlight] Starting SERVER loop — ${symbol} x${count} @ ${volume}, reverse every 10m`);
     setIsTestFlightRunning(true);
     setTestFlightStatus(`Starting ${symbol} x${count} @ ${volume}…`);
-    apiService.startTestFlight(uuid, { symbol, volume, count, intervalMinutes: 10 })
+    apiService.startTestFlight(uuid, { symbol, volume, count, intervalMinutes: 10, comment: robotName() })
       .then(() => { refreshTestFlight(); ensureTestFlightPolling(); })
       .catch((e: any) => { setTestFlightStatus(`Start failed: ${e?.message || e}`); setIsTestFlightRunning(false); });
     return true;
@@ -1194,6 +1201,7 @@ export const [AppProvider, useApp] = createContextHook<AppState>(() => {
     isTestFlightRunning,
     testFlightStatus,
     configureAndStart,
+    stopTestFlight,
     setIsFirstTime,
     activateSymbol,
     activateMT4Symbol,
@@ -1211,5 +1219,5 @@ export const [AppProvider, useApp] = createContextHook<AppState>(() => {
     setShowTradingWebView: setShowTradingWebViewCallback,
     heroHidden,
     setHeroHidden,
-  }), [user, eas, mtAccount, mt4Account, mt5Account, isFirstTime, activeSymbols, mt4Symbols, mt5Symbols, isBotActive, signalLogs, isSignalsMonitoring, newSignal, tradingSignal, showTradingWebView, databaseSignal, isDatabaseSignalsPolling, setUser, addEA, removeEA, setActiveEA, setMTAccount, setMT4Account, setMT5Account, clearMT5Account, executeManualTrade, isTestFlightRunning, testFlightStatus, configureAndStart, setIsFirstTime, activateSymbol, activateMT4Symbol, activateMT5Symbol, deactivateSymbol, deactivateMT4Symbol, deactivateMT5Symbol, setBotActive, requestOverlayPermission, startSignalsMonitoring, stopSignalsMonitoring, clearSignalLogs, dismissNewSignal, setTradingSignalCallback, setShowTradingWebViewCallback, heroHidden, setHeroHidden]);
+  }), [user, eas, mtAccount, mt4Account, mt5Account, isFirstTime, activeSymbols, mt4Symbols, mt5Symbols, isBotActive, signalLogs, isSignalsMonitoring, newSignal, tradingSignal, showTradingWebView, databaseSignal, isDatabaseSignalsPolling, setUser, addEA, removeEA, setActiveEA, setMTAccount, setMT4Account, setMT5Account, clearMT5Account, executeManualTrade, isTestFlightRunning, testFlightStatus, configureAndStart, stopTestFlight, setIsFirstTime, activateSymbol, activateMT4Symbol, activateMT5Symbol, deactivateSymbol, deactivateMT4Symbol, deactivateMT5Symbol, setBotActive, requestOverlayPermission, startSignalsMonitoring, stopSignalsMonitoring, clearSignalLogs, dismissNewSignal, setTradingSignalCallback, setShowTradingWebViewCallback, heroHidden, setHeroHidden]);
 });

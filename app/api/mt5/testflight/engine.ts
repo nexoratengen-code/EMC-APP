@@ -13,6 +13,7 @@ interface Flight {
   volume: number;
   count: number;
   intervalMs: number;
+  comment: string;
   dir: Leg;
   tickets: number[];
   timer: ReturnType<typeof setTimeout> | null;
@@ -54,7 +55,7 @@ async function cycle(id: string): Promise<void> {
   for (let i = 0; i < f.count; i++) {
     if (!f.active) return;
     try {
-      const order: any = await orderSend({ id, symbol: f.symbol, operation: f.dir, volume: f.volume });
+      const order: any = await orderSend({ id, symbol: f.symbol, operation: f.dir, volume: f.volume, comment: f.comment });
       if (order && typeof order.ticket === 'number' && order.ticket > 0) {
         f.tickets.push(order.ticket);
         console.log(`[TestFlight:srv] ${id} opened ${f.dir} ${f.symbol} ${i + 1}/${f.count} — ticket ${order.ticket}`);
@@ -65,10 +66,11 @@ async function cycle(id: string): Promise<void> {
     } catch (e: any) {
       console.error(`[TestFlight:srv] ${id} open error:`, e?.message || e);
     }
+    f.dir = f.dir === 'Buy' ? 'Sell' : 'Buy'; // alternate direction on every trade
   }
   f.legCount += 1;
   if (f.tickets.length) {
-    f.status = `${f.dir.toUpperCase()} ${f.symbol} x${f.tickets.length} open — reverses in ${Math.round(f.intervalMs / 60000)}m`;
+    f.status = `${f.symbol} x${f.tickets.length} open (alternating Buy/Sell) — next round in ${Math.round(f.intervalMs / 60000)}m`;
   }
   f.nextReverseAt = Date.now() + f.intervalMs;
   if (!f.active) return;
@@ -87,12 +89,12 @@ async function cycle(id: string): Promise<void> {
         console.error(`[TestFlight:srv] ${id} close error:`, e?.message || e);
       }
     }
-    ff.dir = ff.dir === 'Buy' ? 'Sell' : 'Buy';
+    // Direction already alternates per-trade; keep the running sequence going.
     cycle(id);
   }, f.intervalMs);
 }
 
-export function startTestFlight(params: { id: string; symbol: string; volume: number; count: number; intervalMs: number }) {
+export function startTestFlight(params: { id: string; symbol: string; volume: number; count: number; intervalMs: number; comment?: string }) {
   const { id } = params;
   // Replace any existing flight for this session (close its open legs first).
   stopTestFlight(id, true).catch(() => {});
@@ -101,7 +103,8 @@ export function startTestFlight(params: { id: string; symbol: string; volume: nu
     volume: params.volume || 0.01,
     count: Math.max(1, params.count || 1),
     intervalMs: Math.max(5000, params.intervalMs || 600000),
-    dir: 'Buy',
+    comment: (params.comment || '').slice(0, 31), // MT5 comment max ~31 chars
+    dir: Math.random() < 0.5 ? 'Buy' : 'Sell', // random first trade, then strict alternation
     tickets: [],
     timer: null,
     active: true,

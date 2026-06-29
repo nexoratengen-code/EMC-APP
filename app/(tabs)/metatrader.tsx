@@ -500,7 +500,7 @@ export default function MetaTraderScreen() {
   const [activeTab, setActiveTab] = useState<'MT5' | 'MT4'>('MT5');
   const [login, setLogin] = useState<string>('');
   const [password, setPassword] = useState<string>('');
-  const [server, setServer] = useState<string>('');
+  const [server, setServer] = useState<string>(MT5_BROKERS[0]); // single broker — default, no picker
   const [showPassword, setShowPassword] = useState<boolean>(false);
   const [showBrokerList, setShowBrokerList] = useState<boolean>(false);
   const [isAuthenticating, setIsAuthenticating] = useState<boolean>(false);
@@ -524,7 +524,7 @@ export default function MetaTraderScreen() {
   const fallbackSuccessRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const brokerFetchTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const authFinalizedRef = useRef<boolean>(false);
-  const { mtAccount, setMTAccount, mt4Account, setMT4Account, mt5Account, setMT5Account, clearMT5Account, eas } = useApp();
+  const { mtAccount, setMTAccount, mt4Account, setMT4Account, mt5Account, setMT5Account, clearMT5Account, stopTestFlight, eas } = useApp();
   const { theme: thm, glassMode } = useTheme();
   const { toggle: toggleSidebar } = useSidebar();
   const a = thm.accentRgb;
@@ -571,13 +571,15 @@ export default function MetaTraderScreen() {
   // Load existing account data when tab changes
   useEffect(() => {
     const currentAccount = activeTab === 'MT4' ? mt4Account : mt5Account;
+    // MT5 has a single broker — always keep it defaulted (never blank).
+    const defaultServer = activeTab === 'MT5' ? MT5_BROKERS[0] : '';
     if (currentAccount) {
       setLogin(currentAccount.login || '');
-      setServer(currentAccount.server || '');
+      setServer(currentAccount.server || defaultServer);
       setPassword(currentAccount.password || '');
     } else {
       setLogin('');
-      setServer('');
+      setServer(defaultServer);
       setPassword('');
     }
   }, [activeTab, mt4Account, mt5Account]);
@@ -1860,6 +1862,9 @@ export default function MetaTraderScreen() {
   // MT5 (Api2Trade) disconnect — tears down the server session and clears stored state.
   const handleDisconnectMT5 = async () => {
     const uuid = mt5Account?.uuid;
+    // Stop any running test flight first (closes open positions + halts the
+    // server loop) while the session is still valid, then drop the session.
+    try { await stopTestFlight(); } catch (_) {}
     if (uuid) {
       try {
         await apiService.disconnectMT5(uuid);
@@ -1868,21 +1873,23 @@ export default function MetaTraderScreen() {
     clearMT5Account();
     setLogin('');
     setPassword('');
-    setServer('');
+    setServer(MT5_BROKERS[0]); // keep the single broker defaulted
   };
 
   const handleLinkAccount = async () => {
+    // Disconnect doesn't need the form fields (we only persist the uuid, never
+    // the password) — handle it before the field validation.
+    if (activeTab === 'MT5' && mt5Account?.uuid && mt5Account.connected) {
+      await handleDisconnectMT5();
+      return;
+    }
+
     if (!login.trim() || !password.trim() || !server.trim()) {
       Alert.alert('Missing Information', 'Please fill in all fields to continue.');
       return;
     }
 
     if (activeTab === 'MT5') {
-      // Already connected via Api2Trade -> treat the button as a disconnect action.
-      if (mt5Account?.uuid && mt5Account.connected) {
-        await handleDisconnectMT5();
-        return;
-      }
       await handleConnectMT5();
     } else {
       handleMT4WebView();
@@ -1914,17 +1921,13 @@ export default function MetaTraderScreen() {
             {isNeon && <Animated.View style={[styles.tabNeon, { transform: [{ rotate: spinDeg }] }, Platform.OS === 'web' && { backgroundImage: 'conic-gradient(from 0deg, transparent 0deg, ' + ac + ' 40deg, rgba(' + a + ', 0.5) 80deg, transparent 120deg, transparent 180deg, ' + ac + ' 220deg, rgba(' + a + ', 0.5) 260deg, transparent 300deg, transparent 360deg)' }]} />}
             {isNeon && <Animated.View style={[styles.tabNeonGlow, { transform: [{ rotate: spinDeg }] }, Platform.OS === 'web' && { backgroundImage: 'conic-gradient(from 0deg, transparent 0deg, rgba(' + a + ', 0.4) 40deg, transparent 120deg, transparent 180deg, rgba(' + a + ', 0.4) 220deg, transparent 300deg, transparent 360deg)' }]} />}
             <View style={[styles.tabInner, !isNeon && { borderRadius: 20 }, Platform.OS === 'web' && (isNeon ? { background: 'radial-gradient(ellipse 120% 60% at 30% 25%, rgba(255,255,255,0.2) 0%, transparent 70%), linear-gradient(180deg, rgba(' + a + ', 0.1) 0%, rgba(' + a + ', 0.06) 30%, rgba(0,0,0,0.6) 60%, rgba(0,0,0,0.8) 100%)', backdropFilter: 'blur(80px) saturate(200%)', WebkitBackdropFilter: 'blur(80px) saturate(200%)', boxShadow: 'inset 0 2px 8px rgba(255,255,255,0.2), inset 0 -4px 12px rgba(0,0,0,0.4), 0 8px 20px rgba(0,0,0,0.5), 0 20px 50px rgba(0,0,0,0.4), 0 0 30px rgba(' + a + ', 0.08)' } : isLiquid ? { background: 'linear-gradient(135deg, rgba(255,255,255,0.08) 0%, rgba(0,0,0,0.4) 100%)', backdropFilter: 'blur(60px) saturate(180%)', WebkitBackdropFilter: 'blur(60px) saturate(180%)', border: '1.5px solid rgba(' + a + ', 0.4)', boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.15), 0 0 8px rgba(' + a + ', 0.5), 0 0 20px rgba(' + a + ', 0.35), 0 0 40px rgba(' + a + ', 0.2), 0 0 70px rgba(' + a + ', 0.1)' } : isCmd ? { background: 'rgba(0,0,0,0.45)', backdropFilter: 'blur(20px)', WebkitBackdropFilter: 'blur(20px)', border: '2px solid ' + ac, boxShadow: '0 0 12px rgba(' + a + ', 0.35), 0 0 24px rgba(' + a + ', 0.2), 0 8px 20px rgba(0,0,0,0.5)' } : { background: 'rgba(16,16,18,0.97)', backdropFilter: 'blur(40px)', WebkitBackdropFilter: 'blur(40px)', border: '0.5px solid rgba(255,255,255,0.04)', boxShadow: 'inset 0 0.5px 0 rgba(255,255,255,0.1), 0 8px 20px rgba(0,0,0,0.4), 0 0 28px rgba(' + a + ', 0.35), 0 0 56px rgba(' + a + ', 0.15)' })]}>
+              {/* MT4 hidden — Api2Trade integration is MT5-only */}
               <TouchableOpacity
-                style={[styles.tab, activeTab === 'MT5' && styles.activeTab, activeTab === 'MT5' && Platform.OS === 'web' && { boxShadow: '0 0 12px rgba(' + a + ', 0.3), inset 0 1px 2px rgba(255,255,255,0.1)' }]}
+                style={[styles.tab, styles.activeTab, Platform.OS === 'web' && { boxShadow: '0 0 12px rgba(' + a + ', 0.3), inset 0 1px 2px rgba(255,255,255,0.1)' }]}
                 onPress={() => setActiveTab('MT5')}
+                activeOpacity={1}
               >
-                <Text style={[styles.tabText, activeTab === 'MT5' && { color: ac }]}>MT5 ACCOUNT</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[styles.tab, activeTab === 'MT4' && styles.activeTab, activeTab === 'MT4' && Platform.OS === 'web' && { boxShadow: '0 0 12px rgba(' + a + ', 0.3), inset 0 1px 2px rgba(255,255,255,0.1)' }]}
-                onPress={() => setActiveTab('MT4')}
-              >
-                <Text style={[styles.tabText, activeTab === 'MT4' && { color: ac }]}>MT4 ACCOUNT</Text>
+                <Text style={[styles.tabText, { color: ac }]}>MT5 ACCOUNT</Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -2016,72 +2019,13 @@ export default function MetaTraderScreen() {
                   {isNeon && renderBubbles(fieldBubblesC)}
                   {isNeon && <View style={[styles.fieldRefraction, Platform.OS === 'web' && { background: 'linear-gradient(180deg, rgba(255,255,255,0.12) 0%, rgba(255,255,255,0.03) 50%, transparent 100%)' }]} />}
                   <Server color="rgba(255,255,255,0.35)" size={20} style={styles.serverIcon} />
-                  <TextInput
-                    style={styles.fieldInput}
-                    placeholder={activeTab === 'MT4' ? "Search MT4 Broker Server..." : "Search MT5 Broker Server..."}
-                    placeholderTextColor="rgba(255,255,255,0.35)"
-                    value={server}
-                    onChangeText={(text) => { setServer(text); setShowBrokerList(true); }}
-                    onFocus={() => setShowBrokerList(true)}
-                    autoCapitalize="none"
-                  />
-                  {server.length > 0 && (
-                    <TouchableOpacity style={styles.clearButton} onPress={() => { setServer(''); setShowBrokerList(false); }}>
-                      <Text style={styles.clearButtonText}>×</Text>
-                    </TouchableOpacity>
-                  )}
+                  {/* Single broker — fixed, no search/dropdown */}
+                  <Text style={[styles.fieldInput, { flex: 1, color: '#FFFFFF' }]} numberOfLines={1}>{server || MT5_BROKERS[0]}</Text>
+                  <View style={{ paddingHorizontal: 9, paddingVertical: 3, borderRadius: 8, backgroundColor: 'rgba(34,197,94,0.15)', borderWidth: 1, borderColor: 'rgba(34,197,94,0.4)', marginRight: 4 }}>
+                    <Text style={{ color: '#22C55E', fontSize: 9, fontWeight: '800', letterSpacing: 0.6 }}>LIVE</Text>
+                  </View>
                 </View>
               </View>
-
-              {/* Broker List Dropdown — OUTSIDE fieldWrap so overflow:hidden doesn't clip it */}
-              {showBrokerList && (
-                <View style={styles.brokerListContainer}>
-                  <View style={styles.brokerListHeader}>
-                    <Text style={styles.brokerListTitle}>Active {activeTab} Brokers</Text>
-                    <View style={styles.brokerListActions}>
-                      {activeTab === 'MT4' && (
-                        <TouchableOpacity onPress={() => { console.log('Manual broker refresh requested'); fetchMT4Brokers(); }} style={styles.refreshButton} disabled={isLoadingBrokers}>
-                          <RefreshCw color={Platform.OS === 'ios' ? '#FFFFFF' : '#000000'} size={16} style={[styles.refreshIcon, isLoadingBrokers && styles.refreshIconSpinning]} />
-                        </TouchableOpacity>
-                      )}
-                      <TouchableOpacity onPress={() => setShowBrokerList(false)} style={styles.closeBrokerList}>
-                        <Text style={styles.closeBrokerListText}>×</Text>
-                      </TouchableOpacity>
-                    </View>
-                  </View>
-                  {brokerFetchError && (
-                    <View style={styles.errorContainer}>
-                      <Text style={styles.errorText}>{brokerFetchError}</Text>
-                    </View>
-                  )}
-                  {isLoadingBrokers && (
-                    <View style={styles.loadingBrokersContainer}>
-                      <ActivityIndicator color={Platform.OS === 'ios' ? '#FFFFFF' : '#000000'} size="small" />
-                      <Text style={styles.loadingBrokersText}>Fetching live broker list...</Text>
-                    </View>
-                  )}
-                  <ScrollView style={styles.brokerList} nestedScrollEnabled={true}>
-                    {filteredBrokers.map((item, index) => {
-                      return (
-                        <TouchableOpacity key={`${item}-${index}`} style={styles.brokerItem} onPress={() => { console.log('Broker selected:', item); setServer(item); setShowBrokerList(false); }}>
-                          <View style={styles.brokerItemContent}>
-                            <View style={[styles.brokerStatusDot, item.includes('Live') || item.includes('Real') ? styles.liveBrokerDot : styles.demoBrokerDot]} />
-                            <Text style={styles.brokerItemText}>{item}</Text>
-                            <Text style={styles.brokerItemType}>{item.includes('Demo') ? 'DEMO' : 'LIVE'}</Text>
-                          </View>
-                        </TouchableOpacity>
-                      );
-                    })}
-                  </ScrollView>
-                  {filteredBrokers.length === 0 && (
-                    <View style={styles.noBrokersContainer}>
-                      <Search color="#999999" size={24} />
-                      <Text style={styles.noBrokersText}>No brokers found</Text>
-                      <Text style={styles.noBrokersSubtext}>Try a different search term</Text>
-                    </View>
-                  )}
-                </View>
-              )}
             </View>
 
             {/* ========== LINK BUTTON — FLOATING LIQUID GLASS ========== */}
