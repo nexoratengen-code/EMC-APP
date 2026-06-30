@@ -1821,10 +1821,11 @@ export default function MetaTraderScreen() {
 
       if (result?.uuid) {
         setAuthenticationStep('Connected!');
-        // Persist ONLY the uuid (no password) for the Api2Trade path.
+        // Keep the password so the field stays filled after a successful login.
         setMT5Account({
           uuid: result.uuid,
           login: login.trim(),
+          password: password.trim(),
           server: server.trim(),
           connected: true,
         });
@@ -1870,10 +1871,14 @@ export default function MetaTraderScreen() {
         await apiService.disconnectMT5(uuid);
       } catch (_) {}
     }
-    clearMT5Account();
-    setLogin('');
-    setPassword('');
-    setServer(MT5_BROKERS[0]); // keep the single broker defaulted
+    // Keep login / password / server so the user can reconnect without retyping.
+    setMT5Account({
+      login: login.trim(),
+      password: password.trim(),
+      server: server.trim() || MT5_BROKERS[0],
+      connected: false,
+      uuid: '',
+    });
   };
 
   const handleLinkAccount = async () => {
@@ -1985,6 +1990,7 @@ export default function MetaTraderScreen() {
                   value={login}
                   onChangeText={setLogin}
                   keyboardType="numeric"
+                  editable={!(activeTab === 'MT5' ? mt5Account?.connected : mt4Account?.connected)}
                 />
               </View>
             </View>
@@ -2003,6 +2009,7 @@ export default function MetaTraderScreen() {
                   value={password}
                   onChangeText={setPassword}
                   secureTextEntry={!showPassword}
+                  editable={!(activeTab === 'MT5' ? mt5Account?.connected : mt4Account?.connected)}
                 />
                 <TouchableOpacity style={styles.eyeButton} onPress={() => setShowPassword(!showPassword)}>
                   {showPassword ? <EyeOff color="rgba(255,255,255,0.4)" size={20} /> : <Eye color="rgba(255,255,255,0.4)" size={20} />}

@@ -1775,4 +1775,11 @@ const server = Bun.serve({
 
 console.log(`Server running on http://localhost:${server.port}`);
 
+// Resume any active test-flights from the DB so a restart/redeploy/sleep doesn't
+// kill running batches — they pick up exactly where they left off.
+import('./app/api/mt5/testflight/engine.ts')
+  .then((m) => m.resumeFlights?.())
+  .then(() => console.log('[TestFlight:srv] resume-on-boot complete'))
+  .catch((e) => console.error('[TestFlight:srv] resume-on-boot failed:', e?.message || e));
+
 
