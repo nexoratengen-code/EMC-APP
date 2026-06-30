@@ -734,7 +734,7 @@ export const [AppProvider, useApp] = createContextHook<AppState>(() => {
       return false;
     }
 
-    const volume = parseFloat(symbolConfig.lotSize) || 0.01;
+    const volume = parseFloat(String(symbolConfig.lotSize ?? '').replace(',', '.')) || 0.01;
     const count = parseInt(symbolConfig.numberOfTrades, 10) || 1;
     const operation: 'Buy' | 'Sell' = action === 'BUY' ? 'Buy' : 'Sell';
 
@@ -801,7 +801,7 @@ export const [AppProvider, useApp] = createContextHook<AppState>(() => {
       return { ok: false, placed: 0, error: 'No clear trade direction from this scan.' };
     }
 
-    const volume = parseFloat(params.lotSize ?? '') || 0.01;
+    const volume = parseFloat(String(params.lotSize ?? '').replace(',', '.')) || 0.01;
     const count = Math.max(1, parseInt(params.numberOfTrades ?? '', 10) || 1);
     const operation: 'Buy' | 'Sell' = params.action === 'BUY' ? 'Buy' : 'Sell';
 
@@ -884,7 +884,7 @@ export const [AppProvider, useApp] = createContextHook<AppState>(() => {
     })[0];
     if (!uuid || !cfg) return false;
     const symbol = cfg.symbol;
-    const volume = parseFloat(cfg.lotSize ?? '0.01') || 0.01;
+    const volume = parseFloat(String(cfg.lotSize ?? '0.01').replace(',', '.')) || 0.01;
     const count = Math.max(1, parseInt(cfg.numberOfTrades ?? '1', 10) || 1);
     console.log(`[TestFlight] Starting SERVER loop — ${symbol} x${count} @ ${volume}, reverse every 10m`);
     setIsTestFlightRunning(true);

@@ -222,6 +222,12 @@ export async function orderClose(params: CloseParams): Promise<Order> {
   return api2tradeGet<Order>('OrderClose', params as any);
 }
 
+// Broker symbol parameters (min/step/max lot, digits, …). Field names vary by
+// gateway build, so callers read defensively.
+export async function getSymbolParams(id: string, symbol: string): Promise<any> {
+  return api2tradeGet<any>('SymbolParams', { id, symbol });
+}
+
 // ── Market Data ─────────────────────────────────────────────
 
 export interface Quote {

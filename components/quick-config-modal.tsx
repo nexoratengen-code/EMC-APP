@@ -124,13 +124,14 @@ export default function QuickConfigModal({ visible, uuid, accent = '#22C55E', on
 
 const styles = StyleSheet.create({
   overlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.7)', justifyContent: 'center', alignItems: 'center', padding: 20 },
-  card: { width: '100%', maxWidth: 460, borderWidth: 1, borderRadius: 20, padding: 18, gap: 12, backgroundColor: '#0D1117' },
+  card: { width: '100%', maxWidth: 460, alignSelf: 'center', overflow: 'hidden', borderWidth: 1, borderRadius: 20, padding: 18, gap: 12, backgroundColor: '#0D1117' },
   header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   title: { fontSize: 14, fontWeight: '800', letterSpacing: 1 },
   hint: { color: '#9CA3AF', fontSize: 12, lineHeight: 17 },
   input: {
     backgroundColor: 'rgba(255,255,255,0.05)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.12)',
     borderRadius: 12, paddingHorizontal: 14, paddingVertical: 11, color: '#FFFFFF', fontSize: 14, fontWeight: '600',
+    minWidth: 0,
   },
   error: { color: '#EF4444', fontSize: 11 },
   chips: { flexDirection: 'row', flexWrap: 'wrap', gap: 7 },

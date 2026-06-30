@@ -9,7 +9,7 @@
 //    continues them — catching up a single rotation if it was down for a while.
 //  • Keep-alive: self-pings RENDER_EXTERNAL_URL/health to reduce free-tier sleep
 //    (an EXTERNAL uptime pinger is still the dependable anti-sleep on free tier).
-import { orderSend, orderClose, getOpenOrders } from '@/services/api2trade';
+import { orderSend, orderClose, getOpenOrders, getSymbolParams } from '@/services/api2trade';
 import { getPool } from '@/app/api/_db';
 
 type Leg = 'Buy' | 'Sell';
@@ -37,6 +37,11 @@ let masterTimer: ReturnType<typeof setInterval> | null = null;
 let keepAliveTimer: ReturnType<typeof setInterval> | null = null;
 let tableReady = false;
 
+// DB persistence + resume only run in production (Render). Otherwise a local dev
+// server sharing the same MySQL would resume — and TRADE — live production
+// flights. Opt in locally with TESTFLIGHT_PERSIST=1 (and your own DB) if needed.
+const PERSIST_ENABLED = process.env.RENDER === 'true' || process.env.TESTFLIGHT_PERSIST === '1';
+
 // ── Persistence (MySQL; best-effort — engine still runs in-memory if DB is down) ──
 async function ensureTable(): Promise<void> {
   if (tableReady) return;
@@ -52,6 +57,7 @@ async function ensureTable(): Promise<void> {
 }
 
 function persist(id: string, f: Flight): void {
+  if (!PERSIST_ENABLED) return;
   (async () => {
     try {
       await ensureTable();
@@ -70,6 +76,7 @@ function persist(id: string, f: Flight): void {
 }
 
 function unpersist(id: string): void {
+  if (!PERSIST_ENABLED) return;
   (async () => {
     try { await ensureTable(); const pool = await getPool(); await pool.query('DELETE FROM emc_testflights WHERE uuid = ?', [id]); }
     catch (e: any) { console.error('[TestFlight:srv] unpersist error:', e?.message || e); }
@@ -117,6 +124,22 @@ async function closeBatch(id: string, f: Flight): Promise<void> {
       .then(() => console.log(`[TestFlight:srv] ${id} closed ticket ${t}`))
       .catch((e: any) => console.error(`[TestFlight:srv] ${id} close error:`, e?.message || e)),
   ));
+}
+
+// Lift the volume to the broker's minimum lot for this symbol so orders aren't
+// rejected as "invalid volume" (many .mic/cent symbols have a min above 0.01).
+async function ensureMinLot(id: string, f: Flight): Promise<void> {
+  try {
+    const p: any = await getSymbolParams(id, f.symbol);
+    const min = Number(
+      p?.volumeMin ?? p?.volume_min ?? p?.minVolume ?? p?.lotMin ?? p?.minLot ?? p?.tradeVolumeMin,
+    );
+    if (Number.isFinite(min) && min > 0 && f.volume < min) {
+      console.log(`[TestFlight:srv] ${id} volume ${f.volume} below broker min ${min} — lifting to ${min}`);
+      f.volume = min;
+      persist(id, f);
+    }
+  } catch (e: any) { console.error(`[TestFlight:srv] ${id} ensureMinLot error:`, e?.message || e); }
 }
 
 // Close any positions already open on this symbol so a flight starts flat.
@@ -194,9 +217,10 @@ export function startTestFlight(params: { id: string; symbol: string; volume: nu
   ensureKeepAlive();
   ensureMaster();
   console.log(`[TestFlight:srv] START ${id} — ${f.symbol} x${f.count} @ ${f.volume}, every ${Math.round(f.intervalMs / 60000)}m`);
-  // Clear leftovers, then fire the first batch immediately (don't wait for the tick).
+  // Clear leftovers, lift to broker min lot, then fire the first batch immediately.
   (async () => {
     await cleanSymbol(id, f.symbol);
+    await ensureMinLot(id, f);
     if (flights.get(id) === f && f.active) await tickFlight(id);
   })();
   return { ok: true, running: true };
@@ -239,6 +263,7 @@ export function getStatus(id: string) {
 
 // ── Resume on boot ──
 export async function resumeFlights(): Promise<void> {
+  if (!PERSIST_ENABLED) { console.log('[TestFlight:srv] resume disabled (not production) — skipping'); return; }
   try {
     await ensureTable();
     const pool = await getPool();
