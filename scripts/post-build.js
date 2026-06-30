@@ -169,6 +169,17 @@ if (fs.existsSync(indexPath)) {
     );
   }
 
+  // Collapse to a single, non-scalable viewport. iOS auto-zooms when a text
+  // field is focused (font < 16px) and in a home-screen PWA it doesn't zoom
+  // back out, leaving the layout shifted and not fitting the screen. Removing
+  // every emitted viewport tag and re-adding one with maximum-scale/user-scalable
+  // stops the zoom (standalone PWAs honor it).
+  html = html.replace(/\s*<meta name="viewport"[^>]*>/g, '');
+  html = html.replace(
+    '<head>',
+    '<head>\n  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">',
+  );
+
   fs.writeFileSync(indexPath, html);
   console.log('Updated index.html with PWA meta tags');
 }
