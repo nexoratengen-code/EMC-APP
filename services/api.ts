@@ -272,6 +272,19 @@ class ApiService {
     return data;
   }
 
+  // Verify + silently re-establish the session behind `uuid` under the same id.
+  async reconnectMT5(uuid: string, server: string, login: string, password: string): Promise<{ uuid: string; reconnected: boolean }> {
+    const endpoint = `${this.getServerBase()}/api/mt5/reconnect`;
+    const res = await fetch(endpoint, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id: uuid, server, login, password }),
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data?.error || 'Reconnect failed');
+    return data;
+  }
+
   async getMT5AccountSummary(uuid: string): Promise<any> {
     const endpoint = `${this.getServerBase()}/api/mt5/account?id=${encodeURIComponent(uuid)}`;
     const res = await fetch(endpoint);

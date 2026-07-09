@@ -32,7 +32,7 @@ const mockQuotes: Quote[] = [
 ];
 
 export default function QuotesScreen() {
-  const { eas, activeSymbols, mt4Symbols, mt5Symbols, mt5Account } = useApp();
+  const { eas, activeSymbols, mt4Symbols, mt5Symbols, mt5Account, ensureMT5Connected } = useApp();
   const { theme: thm, glassMode } = useTheme();
   const a = thm.accentRgb;
   const ac = thm.accent;
@@ -89,8 +89,15 @@ export default function QuotesScreen() {
 
       let response: { data: ApiSymbol[] } = { data: [] };
       if (mt5Account?.uuid) {
-        // Pull the broker's full symbol universe from the connected Api2Trade account
-        const syms = await apiService.getMT5Symbols(mt5Account.uuid);
+        // Pull the broker's full symbol universe from the connected Api2Trade account.
+        let syms: string[] = [];
+        try {
+          syms = await apiService.getMT5Symbols(mt5Account.uuid);
+        } catch {
+          // Stale session → reconnect under the same handle, retry once (no loop).
+          const fresh = await ensureMT5Connected();
+          if (fresh) syms = await apiService.getMT5Symbols(fresh);
+        }
         if (Array.isArray(syms)) {
           response = { data: syms.map((name) => ({ name } as unknown as ApiSymbol)) };
         }

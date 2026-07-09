@@ -116,6 +116,30 @@ export async function getAccountSummary(id: string): Promise<AccountSummary> {
   return api2tradeGet<AccountSummary>('AccountSummary', { id });
 }
 
+// Verify the session behind `id` is live and, if not, silently re-establish it
+// under the SAME id from stored credentials. The account-summary probe IS the
+// real source of truth (a live session returns leverage > 0). CheckConnect is
+// written but not trusted here — the probe's success is what actually matters.
+export async function ensureConnected(
+  id: string,
+  server: string,
+  user: string,
+  password: string,
+): Promise<{ reconnected: boolean }> {
+  try {
+    const summary = await getAccountSummary(id);
+    if (summary?.leverage) return { reconnected: false };
+  } catch {
+    /* probe failed -> treat as dead, re-establish below */
+  }
+  // Re-auth under the same id. Tolerate ConnectEx throwing (e.g. "already
+  // connected") — the summary re-check is the gate, not ConnectEx's response.
+  await connectEx(id, server, user, password).catch(() => {});
+  const summary = await getAccountSummary(id);
+  if (!summary?.leverage) throw new Error('Reconnect failed');
+  return { reconnected: true };
+}
+
 export interface AccountDetails {
   serverName: string;
   user: number;

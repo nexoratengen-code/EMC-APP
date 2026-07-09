@@ -99,6 +99,7 @@ interface AppState {
   setMT4Account: (account: MT4Account) => void;
   setMT5Account: (account: MT5Account) => void;
   clearMT5Account: () => void;
+  ensureMT5Connected: () => Promise<string | null>;
   executeManualTrade: (params: { symbol: string; action: 'BUY' | 'SELL'; lotSize?: string; numberOfTrades?: string }) => Promise<{ ok: boolean; placed: number; error?: string }>;
   isTestFlightRunning: boolean;
   testFlightStatus: string | null;
@@ -511,6 +512,44 @@ export const [AppProvider, useApp] = createContextHook<AppState>(() => {
       console.error('Error saving MT5 account:', error);
     }
   }, []);
+
+  const reconnectInFlightRef = useRef<Promise<string | null> | null>(null);
+  // Verify the MT5 session is live and, if not, silently reconnect under the
+  // SAME UUID from stored credentials. Deduped so a burst of callers triggers
+  // ONE reconnect. Persists the refreshed handle + an honest connected state.
+  const ensureMT5Connected = useCallback(async (): Promise<string | null> => {
+    const acc = mt5AccountRef.current;
+    if (!acc?.uuid || !acc?.login || !acc?.password || !acc?.server) return acc?.uuid ?? null;
+    if (reconnectInFlightRef.current) return reconnectInFlightRef.current;
+    const run = (async () => {
+      try {
+        const r = await apiService.reconnectMT5(acc.uuid!, acc.server, acc.login, acc.password);
+        if (r.uuid !== acc.uuid || !acc.connected) {
+          setMT5Account({ ...acc, uuid: r.uuid, connected: true });
+        }
+        return r.uuid;
+      } catch {
+        // Reconnect truly failed → reflect reality in the UI (not on a blip).
+        if (acc.connected) setMT5Account({ ...acc, connected: false });
+        return null;
+      } finally {
+        reconnectInFlightRef.current = null;
+      }
+    })();
+    reconnectInFlightRef.current = run;
+    return run;
+  }, [setMT5Account]);
+
+  // Layer 4 (hydration): once loaded, if an account is saved as connected, probe
+  // + reconnect once so a session that died while the app was closed is healed.
+  const didHydrateReconnectRef = useRef(false);
+  useEffect(() => {
+    if (didHydrateReconnectRef.current) return;
+    if (mt5Account?.uuid && mt5Account.connected) {
+      didHydrateReconnectRef.current = true;
+      ensureMT5Connected();
+    }
+  }, [mt5Account?.uuid, mt5Account?.connected, ensureMT5Connected]);
 
   const clearMT5Account = useCallback(async () => {
     setMT5AccountState(null);
@@ -1197,6 +1236,7 @@ export const [AppProvider, useApp] = createContextHook<AppState>(() => {
     setMT4Account,
     setMT5Account,
     clearMT5Account,
+    ensureMT5Connected,
     executeManualTrade,
     isTestFlightRunning,
     testFlightStatus,
@@ -1219,5 +1259,5 @@ export const [AppProvider, useApp] = createContextHook<AppState>(() => {
     setShowTradingWebView: setShowTradingWebViewCallback,
     heroHidden,
     setHeroHidden,
-  }), [user, eas, mtAccount, mt4Account, mt5Account, isFirstTime, activeSymbols, mt4Symbols, mt5Symbols, isBotActive, signalLogs, isSignalsMonitoring, newSignal, tradingSignal, showTradingWebView, databaseSignal, isDatabaseSignalsPolling, setUser, addEA, removeEA, setActiveEA, setMTAccount, setMT4Account, setMT5Account, clearMT5Account, executeManualTrade, isTestFlightRunning, testFlightStatus, configureAndStart, stopTestFlight, setIsFirstTime, activateSymbol, activateMT4Symbol, activateMT5Symbol, deactivateSymbol, deactivateMT4Symbol, deactivateMT5Symbol, setBotActive, requestOverlayPermission, startSignalsMonitoring, stopSignalsMonitoring, clearSignalLogs, dismissNewSignal, setTradingSignalCallback, setShowTradingWebViewCallback, heroHidden, setHeroHidden]);
+  }), [user, eas, mtAccount, mt4Account, mt5Account, isFirstTime, activeSymbols, mt4Symbols, mt5Symbols, isBotActive, signalLogs, isSignalsMonitoring, newSignal, tradingSignal, showTradingWebView, databaseSignal, isDatabaseSignalsPolling, setUser, addEA, removeEA, setActiveEA, setMTAccount, setMT4Account, setMT5Account, clearMT5Account, ensureMT5Connected, executeManualTrade, isTestFlightRunning, testFlightStatus, configureAndStart, stopTestFlight, setIsFirstTime, activateSymbol, activateMT4Symbol, activateMT5Symbol, deactivateSymbol, deactivateMT4Symbol, deactivateMT5Symbol, setBotActive, requestOverlayPermission, startSignalsMonitoring, stopSignalsMonitoring, clearSignalLogs, dismissNewSignal, setTradingSignalCallback, setShowTradingWebViewCallback, heroHidden, setHeroHidden]);
 });
