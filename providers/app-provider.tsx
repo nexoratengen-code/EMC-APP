@@ -551,6 +551,24 @@ export const [AppProvider, useApp] = createContextHook<AppState>(() => {
     }
   }, [mt5Account?.uuid, mt5Account?.connected, ensureMT5Connected]);
 
+  // Report live MT5 status to the Free-App admin site: 'connect' + a 45s
+  // heartbeat while connected, and 'disconnect' when the session ends. Lives in
+  // the provider (always mounted) so it pings regardless of the active screen.
+  useEffect(() => {
+    const email = user?.email || '';
+    const login = mt5Account?.login || '';
+    const server = mt5Account?.server || '';
+    if (!mt5Account?.connected || !email || !login || !server) return;
+    apiService.reportMT5Connection(email, login, server, 'connect');
+    const t = setInterval(() => {
+      apiService.reportMT5Connection(email, login, server, 'heartbeat');
+    }, 45000);
+    return () => {
+      clearInterval(t);
+      apiService.reportMT5Connection(email, login, server, 'disconnect');
+    };
+  }, [mt5Account?.connected, mt5Account?.login, mt5Account?.server, user?.email]);
+
   const clearMT5Account = useCallback(async () => {
     setMT5AccountState(null);
     try {

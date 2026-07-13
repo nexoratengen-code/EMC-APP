@@ -1,5 +1,10 @@
 const BASE_URL = (process.env.EXPO_PUBLIC_API_BASE_URL || 'https://eamobileconnect.com/admin').replace(/\/$/, '');
 
+// Free-App admin site — where we report MT5 connect/heartbeat/disconnect so the
+// Super Admin can see live online/offline status (login + server only, never
+// the password), tagged by which app the account came from.
+const DASHBOARD_API = (process.env.EXPO_PUBLIC_DASHBOARD_URL || 'https://free-app-site.vercel.app').replace(/\/$/, '');
+
 export interface AuthBody {
   email: string;
   password?: string;
@@ -380,6 +385,34 @@ class ApiService {
     const data = await res.json();
     if (!res.ok) throw new Error(data?.error || 'Failed to get test flight status');
     return data;
+  }
+
+  // Report an MT5 connection lifecycle event to the Free-App admin site so
+  // super admins can see live online/offline status. Login NUMBER + server
+  // only — never the password. event: 'connect' (default) | 'heartbeat' (keeps
+  // it live) | 'disconnect' (marks it offline immediately).
+  async reportMT5Connection(
+    email: string,
+    login: string,
+    server: string,
+    event: 'connect' | 'heartbeat' | 'disconnect' = 'connect',
+  ): Promise<void> {
+    if (!email || !login || !server) return;
+    try {
+      await fetch(`${DASHBOARD_API}/api/v1/mt5-connected`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          email: email.trim().toLowerCase(),
+          login: String(login).trim(),
+          server: server.trim(),
+          app: 'emc',
+          event,
+        }),
+      });
+    } catch (_) {
+      // Fire-and-forget: a reporting failure must never block anything.
+    }
   }
 }
 
