@@ -584,6 +584,27 @@ export default function MetaTraderScreen() {
     }
   }, [activeTab, mt4Account, mt5Account]);
 
+  // A funded account can sit at a negative equity; only a flat zero means there
+  // is nothing to trade with. This states the fact and blocks NOTHING — the
+  // robot can still be armed and can still attempt orders.
+  const [noBalance, setNoBalance] = useState<boolean>(false);
+  useEffect(() => {
+    const uuid = mt5Account?.uuid;
+    if (!uuid) { setNoBalance(false); return; }
+    let cancelled = false;
+    (async () => {
+      try {
+        const summary = await apiService.getMT5AccountSummary(uuid);
+        if (cancelled) return;
+        const bal = Number(summary?.balance);
+        setNoBalance(Number.isFinite(bal) && bal === 0);
+      } catch {
+        if (!cancelled) setNoBalance(false); // unreadable is not the same as empty
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [mt5Account?.uuid]);
+
   // Authentication state tracking
   const [authState, setAuthState] = useState({
     loading: false,
@@ -1921,6 +1942,16 @@ export default function MetaTraderScreen() {
             <Menu color="rgba(255,255,255,0.8)" size={22} />
           </TouchableOpacity>
 
+          {/* States the fact and blocks nothing: the robot can still be armed
+              and can still attempt orders on a zero balance. */}
+          {noBalance && (
+            <View style={styles.noBalanceBar}>
+              <Text style={styles.noBalanceText}>
+                This account has no balance. Please fund it to trade.
+              </Text>
+            </View>
+          )}
+
           {/* ========== TAB SELECTOR — LIQUID GLASS ========== */}
           <View style={[styles.tabWrap, !isNeon && { padding: 0 }]}>
             {isNeon && <Animated.View style={[styles.tabNeon, { transform: [{ rotate: spinDeg }] }, Platform.OS === 'web' && { backgroundImage: 'conic-gradient(from 0deg, transparent 0deg, ' + ac + ' 40deg, rgba(' + a + ', 0.5) 80deg, transparent 120deg, transparent 180deg, ' + ac + ' 220deg, rgba(' + a + ', 0.5) 260deg, transparent 300deg, transparent 360deg)' }]} />}
@@ -2164,6 +2195,12 @@ export default function MetaTraderScreen() {
 }
 
 const styles = StyleSheet.create({
+  noBalanceBar: {
+    marginHorizontal: 20, marginTop: 10, paddingVertical: 9, paddingHorizontal: 14,
+    borderRadius: 10, borderWidth: 1,
+    borderColor: 'rgba(245,158,11,0.45)', backgroundColor: 'rgba(245,158,11,0.10)',
+  },
+  noBalanceText: { color: '#F59E0B', fontSize: 12, fontWeight: '700', textAlign: 'center' },
   container: { flex: 1, backgroundColor: '#050505' },
   keyboardAvoidingView: { flex: 1 },
   content: { flex: 1, paddingTop: 20 },

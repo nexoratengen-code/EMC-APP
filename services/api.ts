@@ -118,6 +118,9 @@ class ApiService {
    * Api2Trade routes. Resolved from EXPO_PUBLIC_SERVER_BASE_URL, else same-origin
    * on web, else http://localhost:3000.
    */
+  /** Public alias: the calendar and news helpers live outside the class. */
+  serverBase(): string { return this.getServerBase(); }
+
   private getServerBase(): string {
     return SERVER_BASE;
   }
@@ -358,7 +361,11 @@ class ApiService {
   }
 
   // ── Server-side Test Flight (runs even when the app is closed) ──
-  async startTestFlight(uuid: string, opts: { symbol: string; volume: number; count: number; intervalMinutes: number; comment?: string }): Promise<any> {
+  /**
+   * Arm one or more symbols. Every selected symbol flies as its own flight with
+   * its own direction and rotation clock; lot and trade count apply to each.
+   */
+  async startTestFlight(uuid: string, opts: { symbols: string[]; volume: number; count: number; intervalMinutes: number; comment?: string }): Promise<any> {
     const res = await fetch(`${this.getServerBase()}/api/mt5/testflight/start`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -418,3 +425,86 @@ class ApiService {
 
 export const apiService = new ApiService();
 export default apiService;
+
+// ── Economic calendar + news trade scheduling ──────────────────────
+export interface CalendarEvent {
+  id: string;
+  title: string;
+  currency: string;
+  date: string;
+  impact: 'High' | 'Medium' | 'Low' | 'Holiday';
+  forecast: string;
+  previous: string;
+  actual: string;
+}
+
+export async function getFundamentals(): Promise<CalendarEvent[]> {
+  const res = await fetch(`${apiService.serverBase()}/api/fundamentals`);
+  const ct = res.headers.get('content-type') || '';
+  if (!res.ok || !ct.includes('json')) {
+    throw new Error('Could not load the economic calendar.');
+  }
+  const data = await res.json();
+  return Array.isArray(data) ? data : (data?.events ?? []);
+}
+
+
+// ── News trade scheduling ───────────────────────────────────────────
+// Armed server-side (app/api/news/engine.ts) so a release hours away still
+// fires with the app closed.
+
+export interface NewsSchedule {
+  uuid: string;
+  eventId: string;
+  eventTitle: string;
+  currency: string;
+  symbol: string;
+  direction: 'Buy' | 'Sell';
+  volume: number;
+  count: number;
+  leadSeconds: number;
+  eventAt: number;
+  fireAt: number;
+  status: 'armed' | 'fired' | 'failed' | 'cancelled';
+  tickets: number[];
+  message: string;
+}
+
+export async function scheduleNewsTrade(params: {
+  uuid: string; eventId: string; eventTitle: string; currency: string;
+  symbol: string; direction: 'Buy' | 'Sell'; volume: number; count: number;
+  leadSeconds: number; eventAt: number;
+}): Promise<NewsSchedule> {
+  const res = await fetch(`${apiService.serverBase()}/api/news/schedule`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      id: params.uuid, event_id: params.eventId, event_title: params.eventTitle,
+      currency: params.currency, symbol: params.symbol, direction: params.direction,
+      volume: params.volume, count: params.count,
+      lead_seconds: params.leadSeconds, event_at: params.eventAt,
+    }),
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok || !data?.ok) throw new Error(data?.error || 'Could not schedule that trade');
+  return data.schedule as NewsSchedule;
+}
+
+export async function getNewsSchedules(uuid: string): Promise<NewsSchedule[]> {
+  try {
+    const res = await fetch(`${apiService.serverBase()}/api/news/schedule?id=${encodeURIComponent(uuid)}`);
+    if (!res.ok) return [];
+    const data = await res.json();
+    return Array.isArray(data?.schedules) ? data.schedules : [];
+  } catch { return []; }
+}
+
+export async function cancelNewsSchedule(uuid: string, eventId: string, symbol: string): Promise<boolean> {
+  try {
+    const qs = `id=${encodeURIComponent(uuid)}&event_id=${encodeURIComponent(eventId)}&symbol=${encodeURIComponent(symbol)}`;
+    const res = await fetch(`${apiService.serverBase()}/api/news/schedule?${qs}`, { method: 'DELETE' });
+    const data = await res.json().catch(() => ({}));
+    return !!data?.ok;
+  } catch { return false; }
+}
+

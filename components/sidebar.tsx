@@ -1,6 +1,6 @@
 import React, { useRef, useEffect, useCallback } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Animated, Dimensions, Platform, TouchableWithoutFeedback, Image, ScrollView } from 'react-native';
-import { Home, TrendingUp, Settings, X, BarChart3, Plus, EyeOff, Droplet } from 'lucide-react-native';
+import { Home, TrendingUp, Settings, X, BarChart3, Plus, EyeOff, Droplet, CalendarDays } from 'lucide-react-native';
 import { router, usePathname } from 'expo-router';
 import { useSidebar } from '@/providers/sidebar-provider';
 import { useTheme } from '@/providers/theme-provider';
@@ -12,6 +12,7 @@ const SIDEBAR_WIDTH = 300;
 const NAV_ITEMS = [
   { key: '/', label: 'Home', icon: Home, route: '/' },
   { key: '/metatrader', label: 'MetaTrader', icon: TrendingUp, route: '/metatrader' },
+  { key: '/fundamentals', label: 'Fundamentals', icon: CalendarDays, route: '/fundamentals' },
   { key: '/settings', label: 'Settings', icon: Settings, route: '/settings' },
 ];
 

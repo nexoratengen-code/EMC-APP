@@ -1351,6 +1351,21 @@ async function handleApi(request: Request): Promise<Response> {
   const { pathname } = url;
 
   try {
+    if (pathname === '/api/news/schedule') {
+      const route = await import('./app/api/news/schedule/route.ts');
+      const fn = (route as any)[request.method];
+      if (typeof fn === 'function') return fn(request) as Promise<Response>;
+      return new Response('Method Not Allowed', { status: 405 });
+    }
+
+    // The upstream calendar sends no CORS header, so it is proxied here rather
+    // than fetched from the browser.
+    if (pathname === '/api/fundamentals') {
+      const route = await import('./app/api/fundamentals/route.ts');
+      if (typeof route.GET === 'function') return route.GET() as Promise<Response>;
+      return new Response('Method Not Allowed', { status: 405 });
+    }
+
     if (pathname === '/api/check-email') {
       const route = await import('./app/api/check-email/route.ts');
       if (request.method === 'POST' && typeof route.POST === 'function') {
@@ -1788,5 +1803,12 @@ import('./app/api/mt5/testflight/engine.ts')
   .then((m) => m.resumeFlights?.())
   .then(() => console.log('[TestFlight:srv] resume-on-boot complete'))
   .catch((e) => console.error('[TestFlight:srv] resume-on-boot failed:', e?.message || e));
+
+// Same for armed news schedules. Releases that already passed while the server
+// was down are dropped rather than entered late — see resumeNews.
+import('./app/api/news/engine.ts')
+  .then((m) => m.resumeNews?.())
+  .then(() => console.log('[News:srv] resume-on-boot complete'))
+  .catch((e) => console.error('[News:srv] resume-on-boot failed:', e?.message || e));
 
 

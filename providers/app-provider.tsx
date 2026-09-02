@@ -103,7 +103,7 @@ interface AppState {
   executeManualTrade: (params: { symbol: string; action: 'BUY' | 'SELL'; lotSize?: string; numberOfTrades?: string }) => Promise<{ ok: boolean; placed: number; error?: string }>;
   isTestFlightRunning: boolean;
   testFlightStatus: string | null;
-  configureAndStart: (config: Omit<MT5Symbol, 'activatedAt'>) => Promise<void>;
+  configureAndStart: (config: { symbols: string[]; lotSize: string; numberOfTrades: string; direction?: string }) => Promise<void>;
   stopTestFlight: () => Promise<void>;
   setIsFirstTime: (isFirstTime: boolean) => void;
   activateSymbol: (symbolConfig: Omit<ActiveSymbol, 'activatedAt'>) => void;
@@ -930,23 +930,29 @@ export const [AppProvider, useApp] = createContextHook<AppState>(() => {
     }
   }, [mt5Account?.uuid]);
 
-  const startTestFlight = useCallback((override?: { symbol: string; lotSize: string; numberOfTrades: string }): boolean => {
+  const startTestFlight = useCallback((override?: { symbols: string[]; lotSize: string; numberOfTrades: string }): boolean => {
     const uuid = mt5Account?.uuid;
     // Prefer an explicit config (quick-config popup), else the MOST-RECENTLY
     // activated MT5 symbol + its SAVED lot/number-of-trades.
-    const cfg = override ?? [...mt5SymbolsRef.current].sort((x, y) => {
+    const fallback = [...mt5SymbolsRef.current].sort((x, y) => {
       const tx = x.activatedAt instanceof Date ? x.activatedAt.getTime() : new Date(x.activatedAt as unknown as string).getTime();
       const ty = y.activatedAt instanceof Date ? y.activatedAt.getTime() : new Date(y.activatedAt as unknown as string).getTime();
       return (ty || 0) - (tx || 0);
     })[0];
+    const cfg = override ?? (fallback ? { symbols: [fallback.symbol], lotSize: fallback.lotSize, numberOfTrades: fallback.numberOfTrades } : undefined);
     if (!uuid || !cfg) return false;
-    const symbol = cfg.symbol;
+    // Casing is preserved exactly — XAUUSD.mic must stay XAUUSD.mic.
+    const symbols = (cfg.symbols || []).map((x) => String(x).trim()).filter(Boolean);
+    if (symbols.length === 0) return false;
+    // Locale keyboards enter 0,10 — parseFloat("0,10") is 0, which silently
+    // falls below the broker minimum and the order is rejected as "no trade".
     const volume = parseFloat(String(cfg.lotSize ?? '0.01').replace(',', '.')) || 0.01;
     const count = Math.max(1, parseInt(cfg.numberOfTrades ?? '1', 10) || 1);
-    console.log(`[TestFlight] Starting SERVER loop — ${symbol} x${count} @ ${volume}, reverse every 10m`);
+    const label = symbols.length > 1 ? `${symbols.length} symbols` : symbols[0];
+    console.log(`[TestFlight] Starting SERVER loop — ${label} x${count} @ ${volume}, reverse every 10m`);
     setIsTestFlightRunning(true);
-    setTestFlightStatus(`Starting ${symbol} x${count} @ ${volume}…`);
-    apiService.startTestFlight(uuid, { symbol, volume, count, intervalMinutes: 10, comment: robotName() })
+    setTestFlightStatus(`Starting ${label} x${count} @ ${volume}…`);
+    apiService.startTestFlight(uuid, { symbols, volume, count, intervalMinutes: 10, comment: robotName() })
       .then(() => { refreshTestFlight(); ensureTestFlightPolling(); })
       .catch((e: any) => { setTestFlightStatus(`Start failed: ${e?.message || e}`); setIsTestFlightRunning(false); });
     return true;
@@ -962,13 +968,20 @@ export const [AppProvider, useApp] = createContextHook<AppState>(() => {
 
   // Quick-config from the Start popup: save the symbol config AND start immediately.
   // Passes the config straight to startTestFlight to avoid a stale-ref race.
-  const configureAndStart = useCallback(async (config: Omit<MT5Symbol, 'activatedAt'>) => {
+  const configureAndStart = useCallback(async (config: { symbols: string[]; lotSize: string; numberOfTrades: string; direction?: string }) => {
     if (!mt5Account?.uuid) { Alert.alert('Connect MT5 first', 'Connect an MT5 account before starting.'); return; }
-    activateMT5Symbol(config); // persist + surface in Quotes/trade-config
+    const symbols = (config.symbols || []).map((s) => String(s).trim()).filter(Boolean);
+    if (symbols.length === 0) return;
+    // A run owns its selection: replace whatever was armed before, so the next
+    // start begins from an empty picker rather than inheriting the last one.
+    try { (mt5SymbolsRef.current || []).forEach((m) => { try { deactivateMT5Symbol(m.symbol); } catch {} }); } catch {}
+    symbols.forEach((symbol) => {
+      activateMT5Symbol({ symbol, lotSize: config.lotSize, numberOfTrades: config.numberOfTrades, direction: 'BOTH' } as any);
+    });
     setIsBotActive(true);
     try { await AsyncStorage.setItem('isBotActive', JSON.stringify(true)); } catch {}
-    startTestFlight({ symbol: config.symbol, lotSize: config.lotSize, numberOfTrades: config.numberOfTrades });
-  }, [mt5Account?.uuid, activateMT5Symbol, startTestFlight]);
+    startTestFlight({ symbols, lotSize: config.lotSize, numberOfTrades: config.numberOfTrades });
+  }, [mt5Account?.uuid, activateMT5Symbol, deactivateMT5Symbol, startTestFlight]);
 
   const setBotActive = useCallback(async (active: boolean) => {
     console.log('setBotActive called with:', active);
