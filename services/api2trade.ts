@@ -267,6 +267,39 @@ export async function getQuote(id: string, symbol: string): Promise<Quote> {
   return api2tradeGet<Quote>('GetQuote', { id, symbol });
 }
 
+export interface Candle {
+  time: string;
+  openPrice: number;
+  highPrice: number;
+  lowPrice: number;
+  closePrice: number;
+  tickVolume?: number;
+  spread?: number;
+  volume?: number;
+}
+
+/**
+ * Candles for a symbol. Used to size stops from the symbol's own volatility
+ * rather than a fixed distance, which would be far too wide on EURUSD and far
+ * too tight on XAUUSD.
+ */
+export async function getPriceHistory(
+  id: string,
+  symbol: string,
+  timeframeMinutes: number,
+  from: Date,
+  to: Date,
+): Promise<Candle[]> {
+  const iso = (d: Date) => d.toISOString().slice(0, 19);
+  return api2tradeGet<Candle[]>('PriceHistory', {
+    id,
+    symbol,
+    timeframe: Math.max(1, Math.round(timeframeMinutes)),
+    from: iso(from),
+    to: iso(to),
+  });
+}
+
 export async function getQuoteMany(id: string, symbols: string[]): Promise<Quote[]> {
   const url = new URL(`${API2TRADE_BASE}/GetQuoteMany`);
   url.searchParams.set('id', id);
