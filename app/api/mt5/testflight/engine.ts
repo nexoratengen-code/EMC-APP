@@ -398,7 +398,7 @@ function ensureMaster(): void {
  * Start (or restart) one symbol for an account. Symbols already flying on the
  * same account keep going untouched.
  */
-export function startTestFlight(params: {
+export async function startTestFlight(params: {
   id: string; symbol: string; volume: number; count: number; intervalMs: number; comment?: string;
   /** Stop distance x ATR. Defaults to 1.5. Set to 0 only if you mean it. */
   slAtrMult?: number;
@@ -406,13 +406,28 @@ export function startTestFlight(params: {
   tpAtrMult?: number;
 }) {
   const { id, symbol } = params;
-  const legs = legsOf(id);
 
   // Only the same symbol is replaced. Restarting EURUSD must not close XAUUSD.
-  if (legs.has(symbol)) stopSymbol(id, symbol, true).catch(() => {});
-  else if (liveFlights(id).length >= MAX_SYMBOLS_PER_ACCOUNT) {
+  //
+  // AWAITED. Fire-and-forget let the stop finish AFTER the new flight was
+  // registered, and stopSymbol unregisters an account's map once it empties
+  // (`flights.delete(id)`). The new flight was then sitting in an orphaned
+  // Map: start answered "ok" while status, stop and resume all saw nothing.
+  // That is the "I pressed start and nothing happened" report.
+  if (flights.get(id)?.has(symbol)) {
+    try {
+      await stopSymbol(id, symbol, true);
+    } catch (e: any) {
+      console.error(`[TestFlight:srv] ${id} ${symbol} restart could not stop cleanly:`, e?.message || e);
+      return { ok: false, running: false, error: 'Could not stop the previous run for this symbol' };
+    }
+  } else if (liveFlights(id).length >= MAX_SYMBOLS_PER_ACCOUNT) {
     return { ok: false, running: false, error: `At most ${MAX_SYMBOLS_PER_ACCOUNT} symbols can fly at once` };
   }
+
+  // Re-acquired AFTER the stop, never before it. legsOf re-registers the map
+  // if the stop removed it.
+  const legs = legsOf(id);
 
   const f: Flight = {
     symbol,
@@ -435,6 +450,14 @@ export function startTestFlight(params: {
     tpAtrMult: params.tpAtrMult ?? 3.0,
   };
   legs.set(symbol, f);
+
+  // Prove the flight is reachable through `flights`, not merely through the
+  // local reference. Answering "ok" for a flight nothing can see is a lie the
+  // trader acts on.
+  if (flights.get(id)?.get(symbol) !== f) {
+    console.error(`[TestFlight:srv] ${id} ${symbol} START FAILED — flight was not registered`);
+    return { ok: false, running: false, error: 'Could not register the run. Please try again.' };
+  }
   persist(id);
   ensureKeepAlive();
   ensureMaster();
@@ -449,7 +472,7 @@ export function startTestFlight(params: {
 }
 
 /** Start several symbols at once. Partial failure is reported, not thrown. */
-export function startTestFlights(params: {
+export async function startTestFlights(params: {
   id: string; symbols: string[]; volume: number; count: number; intervalMs: number; comment?: string;
   slAtrMult?: number; tpAtrMult?: number;
 }) {
@@ -462,7 +485,7 @@ export function startTestFlights(params: {
     const symbol = (raw || '').trim();
     if (!symbol || seen.has(symbol)) continue;
     seen.add(symbol);
-    const r = startTestFlight({ ...params, symbol });
+    const r = await startTestFlight({ ...params, symbol });
     if (r.ok) started.push(symbol);
     else rejected.push({ symbol, error: r.error || 'Failed to start' });
   }

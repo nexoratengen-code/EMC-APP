@@ -19,7 +19,7 @@ export async function POST(request: Request): Promise<Response> {
     if (!id || symbols.length === 0 || !volume) {
       return Response.json({ error: 'id, at least one symbol and volume are required' }, { status: 400 });
     }
-    const result = startTestFlights({ id, symbols, volume, count, intervalMs: intervalMinutes * 60_000, comment });
+    const result = await startTestFlights({ id, symbols, volume, count, intervalMs: intervalMinutes * 60_000, comment });
     // Nothing started at all is a failure the caller must see, not a silent ok.
     if (!result.ok) {
       return Response.json({ error: result.rejected[0]?.error || 'Failed to start', ...result }, { status: 502 });
