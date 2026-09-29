@@ -1,4 +1,4 @@
-import { Stack } from "expo-router";
+import { Stack, usePathname, useRouter } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
 import React, { useEffect, useState, Component, ReactNode } from "react";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
@@ -134,6 +134,41 @@ const errorStyles = StyleSheet.create({
   },
 });
 
+/**
+ * Access gate. Nothing past login opens without a paid sign-in, and nothing
+ * past the licence screen opens without a robot, however it is reached:
+ * the iOS edge swipe, the Android back button, or a typed URL.
+ *   - /login: always open
+ *   - / while it is the first-run splash: open
+ *   - /license: needs a signed-in (paid) user
+ *   - everything else: needs a paid user AND at least one robot
+ * A black cover stays up until the redirect lands, so nothing flashes through.
+ */
+function AccessGate() {
+  const { isHydrated, isFirstTime, user, eas } = useApp();
+  const pathname = usePathname() || "/";
+  const router = useRouter();
+
+  let target: string | null = null;
+  if (isHydrated) {
+    const onLogin = pathname.startsWith("/login");
+    const onLicense = pathname.startsWith("/license");
+    const onSplash = isFirstTime && pathname === "/";
+    if (onLogin || onSplash) target = null;
+    else if (isFirstTime) target = "/";
+    else if (!user) target = "/login";
+    else if (onLicense) target = null;
+    else if (!eas || eas.length === 0) target = "/license";
+  }
+
+  useEffect(() => {
+    if (target) router.replace(target as any);
+  }, [target, router]);
+
+  if (isHydrated && !target) return null;
+  return <View pointerEvents="auto" style={[StyleSheet.absoluteFill, { backgroundColor: "#000", zIndex: 9999 }]} />;
+}
+
 function RootLayoutNav() {
   const {
     isFirstTime,
@@ -208,10 +243,12 @@ function RootLayoutNav() {
     <View style={{ flex: 1 }}>
       <Stack screenOptions={{ headerShown: false }}>
         <Stack.Screen name="(tabs)" />
-        <Stack.Screen name="login" />
-        <Stack.Screen name="license" />
+        {/* No swipe-back off the doors: the gate below also covers any other way out. */}
+        <Stack.Screen name="login" options={{ gestureEnabled: false }} />
+        <Stack.Screen name="license" options={{ gestureEnabled: false }} />
         <Stack.Screen name="trade-config" options={{ presentation: "modal" }} />
       </Stack>
+      <AccessGate />
       {/* Always render DynamicIsland when conditions are met, regardless of app state */}
       <DynamicIsland
         visible={!isFirstTime && eas.length > 0 && isBotActive}
