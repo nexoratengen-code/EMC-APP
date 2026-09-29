@@ -78,6 +78,8 @@ interface AppState {
   mt4Account: MT4Account | null;
   mt5Account: MT5Account | null;
   isFirstTime: boolean;
+  /** True once saved data has been read (whatever it held). The access gate waits for it. */
+  isHydrated: boolean;
   activeSymbols: ActiveSymbol[];
   mt4Symbols: MT4Symbol[];
   mt5Symbols: MT5Symbol[];
@@ -129,6 +131,7 @@ export const [AppProvider, useApp] = createContextHook<AppState>(() => {
   const [mt4Account, setMT4AccountState] = useState<MT4Account | null>(null);
   const [mt5Account, setMT5AccountState] = useState<MT5Account | null>(null);
   const [isFirstTime, setIsFirstTimeState] = useState<boolean>(true);
+  const [isHydrated, setIsHydrated] = useState<boolean>(false);
   const [activeSymbols, setActiveSymbols] = useState<ActiveSymbol[]>([]);
   const [mt4Symbols, setMT4Symbols] = useState<MT4Symbol[]>([]);
   const [mt5Symbols, setMT5Symbols] = useState<MT5Symbol[]>([]);
@@ -398,6 +401,8 @@ export const [AppProvider, useApp] = createContextHook<AppState>(() => {
       setMT4Symbols([]);
       setMT5Symbols([]);
       setIsBotActive(false);
+    } finally {
+      setIsHydrated(true);
     }
   };
 
@@ -1290,5 +1295,6 @@ export const [AppProvider, useApp] = createContextHook<AppState>(() => {
     setShowTradingWebView: setShowTradingWebViewCallback,
     heroHidden,
     setHeroHidden,
-  }), [user, eas, mtAccount, mt4Account, mt5Account, isFirstTime, activeSymbols, mt4Symbols, mt5Symbols, isBotActive, signalLogs, isSignalsMonitoring, newSignal, tradingSignal, showTradingWebView, databaseSignal, isDatabaseSignalsPolling, setUser, addEA, removeEA, setActiveEA, setMTAccount, setMT4Account, setMT5Account, clearMT5Account, ensureMT5Connected, executeManualTrade, isTestFlightRunning, testFlightStatus, configureAndStart, stopTestFlight, setIsFirstTime, activateSymbol, activateMT4Symbol, activateMT5Symbol, deactivateSymbol, deactivateMT4Symbol, deactivateMT5Symbol, setBotActive, requestOverlayPermission, startSignalsMonitoring, stopSignalsMonitoring, clearSignalLogs, dismissNewSignal, setTradingSignalCallback, setShowTradingWebViewCallback, heroHidden, setHeroHidden]);
+    isHydrated,
+  }), [isHydrated, user, eas, mtAccount, mt4Account, mt5Account, isFirstTime, activeSymbols, mt4Symbols, mt5Symbols, isBotActive, signalLogs, isSignalsMonitoring, newSignal, tradingSignal, showTradingWebView, databaseSignal, isDatabaseSignalsPolling, setUser, addEA, removeEA, setActiveEA, setMTAccount, setMT4Account, setMT5Account, clearMT5Account, ensureMT5Connected, executeManualTrade, isTestFlightRunning, testFlightStatus, configureAndStart, stopTestFlight, setIsFirstTime, activateSymbol, activateMT4Symbol, activateMT5Symbol, deactivateSymbol, deactivateMT4Symbol, deactivateMT5Symbol, setBotActive, requestOverlayPermission, startSignalsMonitoring, stopSignalsMonitoring, clearSignalLogs, dismissNewSignal, setTradingSignalCallback, setShowTradingWebViewCallback, heroHidden, setHeroHidden]);
 });

@@ -142,7 +142,8 @@ export default function HomeScreen() {
     console.log('Start Now pressed, navigating to login...');
     try {
       setIsFirstTime(false);
-      router.push('/login');
+      // replace, not push: no screen left underneath login to swipe back to
+      router.replace('/login');
     } catch (error) {
       console.error('Error navigating to login:', error);
     }

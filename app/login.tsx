@@ -103,7 +103,7 @@ export default function LoginScreen() {
       // authenticated locally; the next attempt from any browser will be blocked
       // because the backend will see used=true.
       apiService.lockEmail(account.email).catch(() => {});
-      router.push('/license');
+      router.replace('/license');
     } catch (error) {
       console.error('Login error:', error);
       Alert.alert('Error', error instanceof Error ? error.message : 'Login failed. Please try again.');
