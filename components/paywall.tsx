@@ -17,6 +17,7 @@ import { ArrowLeft, Check, ShieldCheck } from 'lucide-react-native';
 
 const CHECKOUT = 'https://eamobileconnect.com/shop/secure-checkout.php';
 const TERMS_URL = 'https://eamobileconnect.com/shop/Ts&Cs.html';
+const PRIVACY_URL = 'https://eamobileconnect.com/admin/info/about/privacy.php';
 const PLANS = [
   { plan: 30,  ref: 'converter_',     label: '1 Month',  sub: '30 days of access',  price: 'US$39.17',  save: '' },
   { plan: 90,  ref: 'converter_90_',  label: '3 Months', sub: '90 days of access',  price: 'US$69.17',  save: 'Save 41%' },
@@ -142,6 +143,8 @@ export function Paywall({ email, accent, accentRgb, notice, checking, onBack, on
           <Text style={styles.legal}>
             By continuing you agree to the{' '}
             <Text style={[styles.legalLink, { color: accent }]} onPress={openTerms}>Terms & Conditions</Text>
+            {' '}and{' '}
+            <Text style={[styles.legalLink, { color: accent }]} onPress={() => Linking.openURL(PRIVACY_URL).catch(() => {})}>Privacy Policy</Text>
           </Text>
 
           {notice ? <Text style={styles.notice}>{notice}</Text> : null}

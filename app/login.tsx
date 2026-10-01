@@ -237,6 +237,17 @@ export default function LoginScreen() {
               </TouchableOpacity>
             </View>
 
+            {/* EA Mobile Connect's own terms and privacy pages (in-app layout). */}
+            <View style={styles.legalRow}>
+              <TouchableOpacity onPress={() => Linking.openURL('https://eamobileconnect.com/admin/info/about/terms.php').catch(() => {})}>
+                <Text style={[styles.legalLink, { color: ac }]}>Terms & Conditions</Text>
+              </TouchableOpacity>
+              <Text style={styles.legalDot}>·</Text>
+              <TouchableOpacity onPress={() => Linking.openURL('https://eamobileconnect.com/admin/info/about/privacy.php').catch(() => {})}>
+                <Text style={[styles.legalLink, { color: ac }]}>Privacy Policy</Text>
+              </TouchableOpacity>
+            </View>
+
             <Text style={styles.footer}>Powered by EA Mobile Connect</Text>
           </Animated.View>
         </ScrollView>
@@ -428,8 +439,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
+  legalRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10, marginTop: 24 },
+  legalLink: { fontSize: 12, textDecorationLine: 'underline' },
+  legalDot: { fontSize: 12, color: 'rgba(255, 255, 255, 0.3)' },
   footer: {
-    marginTop: 32,
+    marginTop: 16,
     fontSize: 11,
     fontWeight: '400',
     color: 'rgba(255, 255, 255, 0.2)',

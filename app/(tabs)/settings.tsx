@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, Text, StyleSheet, SafeAreaView, Platform, TouchableOpacity, ScrollView } from 'react-native';
+import { View, Text, StyleSheet, SafeAreaView, Platform, TouchableOpacity, ScrollView, Linking } from 'react-native';
 import { useTheme, ThemeName, FontFamily, HeroStyle, TextCase, BgType, CardBgMode, CardShape } from '@/providers/theme-provider';
 import { PageBackground } from '@/components/page-background';
 import { AnimatedButton } from '@/components/animated-button';
@@ -259,6 +259,27 @@ export default function SettingsScreen() {
             <Text style={styles.cardSubtitle}>Version, license & support info</Text>
           </View>
         </TouchableOpacity>
+
+        {/* Legal: EA Mobile Connect's own terms and privacy pages. */}
+        {[
+          { title: 'Terms & Conditions', sub: 'The rules for using EA Mobile Connect', url: 'https://eamobileconnect.com/admin/info/about/terms.php' },
+          { title: 'Privacy Policy', sub: 'How your information is handled', url: 'https://eamobileconnect.com/admin/info/about/privacy.php' },
+        ].map((l) => (
+          <TouchableOpacity
+            key={l.url}
+            style={[styles.glassCard, { flexDirection: 'row', alignItems: 'center', marginTop: 12, borderColor: 'rgba(' + theme.accentRgb + ', 0.2)' }]}
+            activeOpacity={0.7}
+            onPress={() => Linking.openURL(l.url).catch(() => {})}
+          >
+            <View style={[styles.cardIconContainer, { borderColor: 'rgba(' + theme.accentRgb + ', 0.2)' }]}>
+              <Text style={[styles.infoIcon, { color: theme.accent }]}>§</Text>
+            </View>
+            <View style={styles.cardTextContainer}>
+              <Text style={styles.cardTitle}>{l.title}</Text>
+              <Text style={styles.cardSubtitle}>{l.sub}</Text>
+            </View>
+          </TouchableOpacity>
+        ))}
 
       </ScrollView>
     </SafeAreaView>
