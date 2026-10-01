@@ -1,11 +1,11 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { View, Text, StyleSheet, TextInput, TouchableOpacity, SafeAreaView, Alert, ActivityIndicator, Image, Linking, Platform, KeyboardAvoidingView, ScrollView, Animated, Dimensions } from 'react-native';
-import { WebView } from 'react-native-webview';
 import { router } from 'expo-router';
 // Networking disabled: avoid external browser/payment flows
 import { useApp } from '@/providers/app-provider';
 import { useTheme } from '@/providers/theme-provider';
 import { apiService } from '@/services/api';
+import { Paywall } from '@/components/paywall';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 
@@ -18,7 +18,10 @@ export default function LoginScreen() {
   const [modalTitle, setModalTitle] = useState<string>('');
   const [modalMessage, setModalMessage] = useState<string>('');
   const [paymentVisible, setPaymentVisible] = useState<boolean>(false);
-  const [paymentUrl, setPaymentUrl] = useState<string>('');
+  // In-app paywall (components/paywall.tsx). "I've paid, continue" re-checks;
+  // a re-check that still finds no payment says so on the paywall.
+  const [paywallNotice, setPaywallNotice] = useState<string>('');
+  const recheckRef = useRef(false);
   const { setUser, user, eas } = useApp();
   const { theme } = useTheme();
   const a = theme.accentRgb;
@@ -59,26 +62,34 @@ export default function LoginScreen() {
   }, [user, eas.length]);
 
   const handleProceed = async () => {
+    // Modal, not Alert.alert (a no-op on the web app, so these said nothing).
     if (!mentorId.trim() || !email.trim()) {
-      Alert.alert('Error', 'Please fill in all fields');
+      setModalTitle('Missing details');
+      setModalMessage('Please fill in all fields.');
+      setModalVisible(true);
       return;
     }
 
-    if (!email.includes('@')) {
-      Alert.alert('Error', 'Please enter a valid email address');
+    // NFKC turns a full-width ＠ (some keyboards) into a plain @.
+    if (!email.normalize('NFKC').includes('@')) {
+      setModalTitle('Check your email');
+      setModalMessage('Please enter a valid email address.');
+      setModalVisible(true);
       return;
     }
 
     setIsLoading(true);
 
     try {
-      const trimmedEmail = email.trim();
+      const trimmedEmail = email.normalize('NFKC').trim();
       const trimmedMentor = mentorId.trim();
       const account = await apiService.authenticate({ email: trimmedEmail, mentor: trimmedMentor });
 
       if (account.status === 'not_found' || !account.paid) {
-        const url = `https://eamobileconnect.com/shop/?email=${encodeURIComponent(trimmedEmail)}&mentor=${encodeURIComponent(trimmedMentor)}`;
-        setPaymentUrl(url);
+        setPaywallNotice(recheckRef.current
+          ? "We haven't received your payment yet. If you just paid, give it a minute and tap \"I've paid, continue\" again."
+          : '');
+        recheckRef.current = false;
         setPaymentVisible(true);
         return;
       }
@@ -106,7 +117,16 @@ export default function LoginScreen() {
       router.replace('/license');
     } catch (error) {
       console.error('Login error:', error);
-      Alert.alert('Error', error instanceof Error ? error.message : 'Login failed. Please try again.');
+      // A failed check is never treated as "not paid": say so and let them retry.
+      const msg = "We couldn't check your account right now. Please try again in a moment.";
+      recheckRef.current = false;
+      if (paymentVisible) {
+        setPaywallNotice(msg);
+      } else {
+        setModalTitle("Couldn't check your account");
+        setModalMessage(msg);
+        setModalVisible(true);
+      }
     } finally {
       setIsLoading(false);
     }
@@ -116,6 +136,21 @@ export default function LoginScreen() {
     setIsPaymentProcessing(false);
     Alert.alert('Offline mode', 'Payments are disabled. Continuing locally.');
   };
+
+  // Unpaid: the paywall takes the whole screen (no framed shop page).
+  if (paymentVisible) {
+    return (
+      <Paywall
+        email={email.normalize('NFKC').trim()}
+        accent={ac}
+        accentRgb={a}
+        notice={paywallNotice}
+        checking={isLoading}
+        onBack={() => { setPaymentVisible(false); setPaywallNotice(''); }}
+        onContinue={() => { recheckRef.current = true; handleProceed(); }}
+      />
+    );
+  }
 
   return (
     <SafeAreaView style={styles.container}>
@@ -202,6 +237,17 @@ export default function LoginScreen() {
               </TouchableOpacity>
             </View>
 
+            {/* EA Mobile Connect's own terms and privacy pages (in-app layout). */}
+            <View style={styles.legalRow}>
+              <TouchableOpacity onPress={() => Linking.openURL('https://eamobileconnect.com/admin/info/about/terms.php').catch(() => {})}>
+                <Text style={[styles.legalLink, { color: ac }]}>Terms & Conditions</Text>
+              </TouchableOpacity>
+              <Text style={styles.legalDot}>·</Text>
+              <TouchableOpacity onPress={() => Linking.openURL('https://eamobileconnect.com/admin/info/about/privacy.php').catch(() => {})}>
+                <Text style={[styles.legalLink, { color: ac }]}>Privacy Policy</Text>
+              </TouchableOpacity>
+            </View>
+
             <Text style={styles.footer}>Powered by EA Mobile Connect</Text>
           </Animated.View>
         </ScrollView>
@@ -230,9 +276,7 @@ export default function LoginScreen() {
                 style={[styles.reactivateButton, { backgroundColor: 'rgba(' + a + ', 0.85)', shadowColor: ac }]}
                 onPress={() => {
                   setModalVisible(false);
-                  const trimmedEmail = email.trim();
-                  const trimmedMentor = mentorId.trim();
-                  setPaymentUrl(`https://eamobileconnect.com/shop/?email=${encodeURIComponent(trimmedEmail)}&mentor=${encodeURIComponent(trimmedMentor)}`);
+                  setPaywallNotice('');
                   setPaymentVisible(true);
                 }}
                 activeOpacity={0.8}
@@ -244,37 +288,6 @@ export default function LoginScreen() {
         </View>
       )}
 
-      {/* Payment Modal */}
-      {paymentVisible && (
-        <View style={styles.modalOverlay}>
-          <View style={[styles.modalCard, styles.paymentModal]}>
-            <View style={styles.paymentHeader}>
-              <Text style={styles.modalTitle}>Complete Payment</Text>
-              <TouchableOpacity
-                onPress={() => setPaymentVisible(false)}
-                style={styles.closeButton}
-                activeOpacity={0.7}
-              >
-                <Text style={styles.closeButtonText}>✕</Text>
-              </TouchableOpacity>
-            </View>
-            {Platform.OS === 'web' ? (
-              <View style={{ flex: 1, borderRadius: 12, overflow: 'hidden' }}>
-                <iframe
-                  src={paymentUrl}
-                  style={{ width: '100%', height: '100%', border: '0' }}
-                  loading="eager"
-                  allow="payment *; clipboard-write;"
-                />
-              </View>
-            ) : (
-              <View style={{ flex: 1, borderRadius: 12, overflow: 'hidden' }}>
-                <WebView source={{ uri: paymentUrl }} startInLoadingState />
-              </View>
-            )}
-          </View>
-        </View>
-      )}
 
     </SafeAreaView>
   );
@@ -426,8 +439,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
+  legalRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10, marginTop: 24 },
+  legalLink: { fontSize: 12, textDecorationLine: 'underline' },
+  legalDot: { fontSize: 12, color: 'rgba(255, 255, 255, 0.3)' },
   footer: {
-    marginTop: 32,
+    marginTop: 16,
     fontSize: 11,
     fontWeight: '400',
     color: 'rgba(255, 255, 255, 0.2)',
