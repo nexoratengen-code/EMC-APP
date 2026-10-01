@@ -129,7 +129,7 @@ class ApiService {
     if (!authBody?.email) throw new Error('Email is required');
     // EMC endpoint: GET /api/auth/app/?email=...&use=0|1
     // Returns: { message: "accept" | "used" | "admin" | "none", version: number }
-    const email = authBody.email.trim().toLowerCase();
+    const email = authBody.email.normalize('NFKC').trim().toLowerCase();
     const endpoint = `${BASE_URL}/api/auth/app/?email=${encodeURIComponent(email)}`;
     let res: Response;
     try {
