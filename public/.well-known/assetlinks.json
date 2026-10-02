@@ -4,7 +4,7 @@
     "target": {
       "namespace": "android_app",
       "package_name": "com.eamobileconnect.app",
-      "sha256_cert_fingerprints": ["7A:6C:3D:A7:44:43:18:7B:E8:E3:7D:CC:3E:04:F5:33:E7:C2:73:2E:EB:2C:E5:4B:E8:83:B7:F7:53:C7:1A:F9"]
+      "sha256_cert_fingerprints": ["56:13:37:DB:C3:65:20:5C:C7:95:F8:E2:24:22:FD:60:AC:3E:EB:B6:D6:FB:A0:92:F4:39:B3:9E:04:22:1F:A1"]
     }
   }
 ]
