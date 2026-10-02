@@ -1,0 +1,10 @@
+[
+  {
+    "relation": ["delegate_permission/common.handle_all_urls"],
+    "target": {
+      "namespace": "android_app",
+      "package_name": "com.eamobileconnect.app",
+      "sha256_cert_fingerprints": ["56:13:37:DB:C3:65:20:5C:C7:95:F8:E2:24:22:FD:60:AC:3E:EB:B6:D6:FB:A0:92:F4:39:B3:9E:04:22:1F:A1"]
+    }
+  }
+]
