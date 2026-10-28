@@ -1,8 +1,10 @@
 import createContextHook from '@nkzw/create-context-hook';
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { Platform, Alert } from 'react-native';
-import { LicenseData, apiService } from '@/services/api';
+import { Platform, Alert, AppState } from 'react-native';
+import {
+  LicenseData, apiService, getMemberSession, clearMemberSession, checkMemberSessionRemote, SIGNED_OUT_REASON_KEY,
+} from '@/services/api';
 import signalsMonitor, { SignalLog } from '@/services/signals-monitor';
 import databaseSignalsPollingService, { DatabaseSignal } from '@/services/database-signals-polling';
 import { mqttSignalsService } from '@/services/mqtt-signals';
@@ -414,6 +416,59 @@ export const [AppProvider, useApp] = createContextHook<AppState>(() => {
       console.error('Error saving user:', error);
     }
   }, []);
+
+  // ── MEMBER SESSION CHECK ON EVERY OPEN (28 Oct 2026) ──
+  // EMC's server decides, not this device: the stored session is sent to
+  // /api/auth/session/ and only its answer can sign someone out. A member who
+  // signed in on another device since (newest sign-in wins), or whose account
+  // is no longer paid, is signed out here. Network trouble keeps them in.
+  const verifyingRef = useRef(false);
+  const verifySession = useCallback(async () => {
+    const email = user?.email;
+    if (!email || verifyingRef.current) return;
+    verifyingRef.current = true;
+    const signOut = async (reason: string) => {
+      console.log('Session not valid, signing out:', reason);
+      setUserState(null);
+      setEAs([]);
+      await AsyncStorage.multiRemove(['user', 'eas']).catch(() => {});
+      await clearMemberSession();
+      await AsyncStorage.setItem(SIGNED_OUT_REASON_KEY, reason).catch(() => {});
+    };
+    try {
+      let session = await getMemberSession();
+      if (!session) {
+        // Signed in before sessions existed: get one quietly with the stored
+        // email. Only the account itself (gone or unpaid) can sign them out.
+        const account = await apiService.authenticate({ email });
+        if (account.status === 'not_found' || !account.paid) {
+          await signOut('not_found');
+          return;
+        }
+        session = await getMemberSession();
+        if (!session) return;
+      }
+      const verdict = await checkMemberSessionRemote(email, session);
+      if (!verdict || verdict.ok) return;
+      if (verdict.reason === 'signed_in_elsewhere' || verdict.reason === 'unpaid' || verdict.reason === 'not_found') {
+        await signOut(verdict.reason);
+      }
+      // Anything else (no_session) is about the session, not the member: keep them in.
+    } catch (e) {
+      console.warn('Session check skipped (network):', e);
+    } finally {
+      verifyingRef.current = false;
+    }
+  }, [user?.email]);
+
+  useEffect(() => {
+    if (!isHydrated || !user?.email) return;
+    verifySession();
+    const sub = AppState.addEventListener('change', (state) => {
+      if (state === 'active') verifySession();
+    });
+    return () => sub.remove();
+  }, [isHydrated, user?.email, verifySession]);
 
   const addEA = useCallback(async (ea: EA) => {
     try {
