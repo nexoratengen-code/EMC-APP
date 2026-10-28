@@ -4,6 +4,7 @@ import { Play, Square, TrendingUp, Trash2, Plus, Menu, BarChart3, CalendarDays, 
 import { router } from 'expo-router';
 import { RobotLogo } from '@/components/robot-logo';
 import { AbyssSplash } from '@/components/abyss-splash';
+import { AbyssHome } from '@/components/abyss-home';
 import { PageBackground } from '@/components/page-background';
 import { AnimatedButton } from '@/components/animated-button';
 import QuickConfigModal from '@/components/quick-config-modal';
@@ -262,6 +263,44 @@ export default function HomeScreen() {
           </TouchableOpacity>
         </View>
       </View>
+    );
+  }
+
+  // The Abyss style draws its own home; every action here is shared with it.
+  if (glassMode === 'abyss' && primaryEA) {
+    return (
+      <>
+        <AbyssHome
+          name={primaryEA.name}
+          description={primaryEA.description || 'Your Trading EA Is Ready.'}
+          image={primaryEAImage && !logoError ? primaryEAImage : null}
+          running={isTestFlightRunning}
+          runningDetail={testFlightStatus}
+          botActive={isBotActive}
+          otherEAs={otherEAs.map((ea) => ({ id: ea.id, name: ea.name, image: getEAImageUrl(ea as unknown as EA) }))}
+          onMenu={toggleSidebar}
+          onTrade={() => { try { handleStartPress(); } catch (e) { console.error(e); } }}
+          onNews={handleNews}
+          onScan={tryScannerOpen}
+          onQuotes={handleQuotes}
+          onRemove={handleRemoveActiveBot}
+          onAddEA={handleAddNewEA}
+          onSwitchEA={(id) => { setActiveEA(id).catch?.(() => {}); }}
+          removeAsk={showRemoveWarning}
+          onRemoveConfirm={confirmRemoveBot}
+          onRemoveCancel={() => setShowRemoveWarning(false)}
+          setupMsg={setupMsg}
+          onSetupConnect={() => { setSetupMsg(null); router.push('/metatrader'); }}
+          onSetupCancel={() => setSetupMsg(null)}
+        />
+        <QuickConfigModal
+          visible={showConfigModal}
+          uuid={mt5Account?.uuid}
+          accent="#FFFFFF"
+          onClose={() => setShowConfigModal(false)}
+          onConfirm={(cfg) => { setShowConfigModal(false); configureAndStart(cfg); }}
+        />
+      </>
     );
   }
 
