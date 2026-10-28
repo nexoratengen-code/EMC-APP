@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useCallback, useEffect, useRef } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Image, ImageBackground, Platform, Dimensions, SafeAreaView, Animated, RefreshControl } from 'react-native';
-import { Play, Square, TrendingUp, Trash2, Plus, Menu, BarChart3 } from 'lucide-react-native';
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Image, ImageBackground, Platform, Dimensions, SafeAreaView, Animated, RefreshControl, Modal } from 'react-native';
+import { Play, Square, TrendingUp, Trash2, Plus, Menu, BarChart3, CalendarDays, Shield } from 'lucide-react-native';
 import { router } from 'expo-router';
 import { RobotLogo } from '@/components/robot-logo';
 import { PageBackground } from '@/components/page-background';
@@ -25,15 +25,29 @@ const hexToRgbString = (hex: string): string => {
 export default function HomeScreen() {
   const { eas, isFirstTime, setIsFirstTime, removeEA, isBotActive, setBotActive, setActiveEA, user, heroHidden, isTestFlightRunning, testFlightStatus, mt5Account, mt5Symbols, configureAndStart } = useApp();
   const [showConfigModal, setShowConfigModal] = useState<boolean>(false);
+  // SETUP REQUIRED pop-up (as on TradePort): Trade or Scan without a connected
+  // MT5 account explains why and offers CONNECT ACCOUNT, instead of jumping
+  // to another screen without a word.
+  const [setupMsg, setSetupMsg] = useState<string | null>(null);
 
-  // Start handler: stop if running; require a connected MT5 account (else send
-  // the user to MetaTrader to connect); when connected, ALWAYS pop the
-  // quick-config modal (pick/confirm symbol + lot + trades each run).
+  // Start handler: stop if running; require a connected MT5 account; when
+  // connected, ALWAYS pop the quick-config modal (symbol + lot + trades each run).
   const handleStartPress = useCallback(() => {
     if (isBotActive) { setBotActive(false); return; }
-    if (!mt5Account?.uuid) { router.push('/metatrader'); return; }
+    if (!mt5Account?.uuid) { setSetupMsg('Connect your MT5 account before starting.'); return; }
     setShowConfigModal(true);
   }, [isBotActive, setBotActive, mt5Account?.uuid]);
+
+  const handleNews = useCallback(() => { router.push('/fundamentals' as any); }, []);
+
+  // The scanner needs a connected MT5 account (as on TradePort).
+  const tryScannerOpen = useCallback(() => {
+    if (!(mt5Account?.uuid && mt5Account?.connected)) {
+      setSetupMsg('Connect your trading account to access the scanner.');
+      return;
+    }
+    router.push('/(tabs)/scanner');
+  }, [mt5Account?.uuid, mt5Account?.connected]);
   const { theme, glassMode, heroStyle, cardBgMode, cardShape, glowColor } = useTheme();
   const { toggle: toggleSidebar } = useSidebar();
   const isNeon = glassMode === 'neon';
@@ -516,11 +530,11 @@ export default function HomeScreen() {
                 {isNeon && <View style={[styles.refraction, Platform.OS === 'web' && { background: 'linear-gradient(180deg, rgba(255,255,255,0.18) 0%, rgba(255,255,255,0.06) 40%, transparent 100%)' }]} />}
                 {isNeon && <View style={[styles.meniscus, Platform.OS === 'web' && { background: 'radial-gradient(ellipse 60% 100% at 50% 0%, rgba(255,255,255,0.12) 0%, transparent 100%)' }]} />}
                 <View style={styles.bottomActions}>
-                  <AnimatedButton testID="action-quotes" accent={cc} accentRgb={glowRgb} glow={false} fillOnSelect={false} style={styles.actionButton} onPress={handleQuotes}>
+                  <AnimatedButton testID="action-fundamentals" accent={cc} accentRgb={glowRgb} glow={false} fillOnSelect={false} style={styles.actionButton} onPress={handleNews}>
                     <View style={styles.buttonIconContainer}>
-                      <TrendingUp color={cc} size={18} />
+                      <CalendarDays color={cc} size={18} />
                     </View>
-                    <Text style={[styles.secondaryButtonText, isCmd && { color: cmdRed }]}>QUOTES</Text>
+                    <Text style={[styles.secondaryButtonText, isCmd && { color: cmdRed }]}>NEWS</Text>
                   </AnimatedButton>
                   <AnimatedButton testID="action-start" accent={cc} accentRgb={glowRgb} glow={false} fillOnSelect={false} style={styles.actionButton} onPress={() => { try { handleStartPress(); } catch (e) { console.error(e); } }}>
                     <View style={[styles.tradeIconOuter, isPill && { width: 72, height: 72, borderRadius: 36 }]}>
@@ -532,11 +546,11 @@ export default function HomeScreen() {
                     </View>
                     <Text style={[styles.tradeButtonText, isBotActive && styles.tradeButtonTextActive, isCmd && { color: cmdRed }]}>{isBotActive ? 'STOP' : 'TRADE'}</Text>
                   </AnimatedButton>
-                  <AnimatedButton testID="action-remove" accent={cc} accentRgb={glowRgb} glow={false} fillOnSelect={false} style={styles.actionButton} onPress={handleRemoveActiveBot}>
+                  <AnimatedButton testID="action-scan" accent={cc} accentRgb={glowRgb} glow={false} fillOnSelect={false} style={styles.actionButton} onPress={tryScannerOpen}>
                     <View style={styles.buttonIconContainer}>
-                      <Trash2 color={isCmd ? cmdRed : ac} size={18} />
+                      <TrendingUp color={cc} size={18} />
                     </View>
-                    <Text style={[styles.removeButtonText, isCmd && { color: cmdRed }]}>REMOVE</Text>
+                    <Text style={[styles.secondaryButtonText, isCmd && { color: cmdRed }]}>SCAN</Text>
                   </AnimatedButton>
                 </View>
               </View>
@@ -581,7 +595,79 @@ export default function HomeScreen() {
             </>
           )}
 
-          {/* EA Info, Chart Scanner, and Add New EA cards moved to sidebar. */}
+          {/* ========== 3. ACTIVE EA CARD (as on TradePort) ==========
+              The EA, and whether its robot is RUNNING on the server or IDLE.
+              Quotes and Remove live here now that the trading panel carries
+              News and Scan. */}
+          {primaryEA && (
+            <View style={[styles.neonWrapInfo, !isNeon && { padding: 0 }, isPill && { alignSelf: 'center' as any }, (isLiquid || isMinimal) && Platform.OS === 'web' && { boxShadow: '0 0 4px rgba(' + a + ',0.7), 0 0 10px rgba(' + a + ',0.4), 0 0 25px rgba(' + a + ',0.2)', borderRadius: shapeRInfo + 2 } as any]}>
+              {isNeon && <Animated.View style={[styles.neonSpinnerInfo, { transform: [{ rotate: cardSpinDeg }] }, Platform.OS === 'web' && { backgroundImage: 'conic-gradient(from 0deg, transparent 0deg, ' + ac + ' 40deg, rgba(' + a + ', 0.5) 80deg, transparent 120deg, transparent 180deg, ' + ac + ' 220deg, rgba(' + a + ', 0.5) 260deg, transparent 300deg, transparent 360deg)' }]} />}
+              {isNeon && <Animated.View style={[styles.neonGlowInfo, { transform: [{ rotate: cardSpinDeg }] }, Platform.OS === 'web' && { backgroundImage: 'conic-gradient(from 0deg, transparent 0deg, rgba(' + a + ', 0.4) 40deg, transparent 120deg, transparent 180deg, rgba(' + a + ', 0.4) 220deg, transparent 300deg, transparent 360deg)' }]} />}
+              <View testID="ea-info-card" style={[styles.eaInfoCard, !isNeon && { borderWidth: isCmd ? 2 : isLiquid ? 1.5 : 0.5, borderColor: isCmd ? cmdRed : isLiquid ? 'rgba(' + a + ', 0.4)' : 'rgba(255,255,255,0.08)' }, Platform.OS === 'web' && (isNeon ? { background: 'radial-gradient(ellipse 120% 50% at 20% 20%, rgba(255,255,255,0.15) 0%, transparent 70%), linear-gradient(180deg, rgba(' + a + ', 0.08) 0%, rgba(0,0,0,0.75) 100%)', backdropFilter: 'blur(60px) saturate(180%)', WebkitBackdropFilter: 'blur(60px) saturate(180%)' } : isLiquid ? { background: 'linear-gradient(135deg, rgba(255,255,255,0.08) 0%, rgba(255,255,255,0.03) 50%, rgba(0,0,0,0.4) 100%)', backdropFilter: 'blur(60px) saturate(180%)', WebkitBackdropFilter: 'blur(60px) saturate(180%)', boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.15), 0 0 8px rgba(' + a + ', 0.5), 0 0 20px rgba(' + a + ', 0.35), 0 0 40px rgba(' + a + ', 0.2), 0 0 70px rgba(' + a + ', 0.1)' } : isCmd ? { background: 'rgba(0,0,0,0.45)', backdropFilter: 'blur(20px)', WebkitBackdropFilter: 'blur(20px)', boxShadow: '0 0 10px rgba(' + cmdRedRgb + ', 0.3), 0 0 20px rgba(' + cmdRedRgb + ', 0.18), 0 4px 14px rgba(0,0,0,0.4)' } : { background: 'linear-gradient(180deg, rgba(255,255,255,0.04) 0%, rgba(0,0,0,0.5) 100%)', backdropFilter: 'blur(40px)', WebkitBackdropFilter: 'blur(40px)', boxShadow: 'inset 0 0.5px 0 rgba(255,255,255,0.1), 0 4px 12px rgba(0,0,0,0.35), 0 0 24px rgba(' + a + ', 0.3), 0 0 48px rgba(' + a + ', 0.12)' }), { borderRadius: shapeRInfo }, { overflow: 'hidden' }]}>
+                {cardBgMode === 'fullcover' && primaryEAImage && Platform.OS === 'web' && (
+                  <View style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, zIndex: 0, backgroundImage: 'url(' + primaryEAImage + ')', backgroundSize: 'cover', backgroundPosition: 'center', opacity: 0.3 } as any} />
+                )}
+                {cardBgMode === 'thumbnail' && (
+                  <View style={styles.eaInfoImageWrap}>
+                    {primaryEAImage && !logoError ? (
+                      <Image source={{ uri: primaryEAImage }} style={styles.eaInfoImage} resizeMode="cover" />
+                    ) : (
+                      <Image source={require('../../assets/images/icon.png')} style={styles.eaInfoImage} resizeMode="contain" />
+                    )}
+                  </View>
+                )}
+                <View style={[styles.eaInfoTextWrap, { zIndex: 1, flex: 1 }]}>
+                  <Text style={styles.eaInfoName} numberOfLines={2}>{primaryEA.name}</Text>
+                  <Text testID="ea-status" style={[styles.eaInfoStatus, { color: isTestFlightRunning ? '#16A34A' : 'rgba(255,255,255,0.4)' }]}>
+                    {isTestFlightRunning ? 'RUNNING' : 'IDLE'}
+                  </Text>
+                  {isTestFlightRunning && !!testFlightStatus && (
+                    <Text style={styles.eaInfoDetail} numberOfLines={1}>{testFlightStatus}</Text>
+                  )}
+                </View>
+                <View style={styles.eaInfoActions}>
+                  <TouchableOpacity testID="action-quotes" onPress={handleQuotes} activeOpacity={0.7} hitSlop={{ top: 8, bottom: 8, left: 6, right: 6 }} style={[styles.eaInfoIconBtn, { borderColor: 'rgba(' + ca + ', 0.35)' }]} accessibilityLabel="Quotes">
+                    <TrendingUp color={cc} size={16} />
+                  </TouchableOpacity>
+                  <TouchableOpacity testID="action-remove" onPress={handleRemoveActiveBot} activeOpacity={0.7} hitSlop={{ top: 8, bottom: 8, left: 6, right: 6 }} style={[styles.eaInfoIconBtn, { borderColor: 'rgba(' + ca + ', 0.35)' }]} accessibilityLabel="Remove EA">
+                    <Trash2 color={cc} size={16} />
+                  </TouchableOpacity>
+                </View>
+              </View>
+            </View>
+          )}
+
+          {/* ========== CHART SCANNER CARD ========== */}
+          <View style={[styles.neonWrapPill, !isNeon && { padding: 0 }, isPill && { alignSelf: 'center' as any }, (isLiquid || isMinimal) && Platform.OS === 'web' && { boxShadow: '0 0 4px rgba(' + a + ',0.7), 0 0 10px rgba(' + a + ',0.4), 0 0 25px rgba(' + a + ',0.2)', borderRadius: shapeRAdd + 2 } as any]}>
+            {isNeon && <Animated.View style={[styles.neonSpinnerPill, { transform: [{ rotate: cardSpinDeg }] }, Platform.OS === 'web' && { backgroundImage: 'conic-gradient(from 0deg, transparent 0deg, ' + ac + ' 40deg, rgba(' + a + ', 0.5) 80deg, transparent 120deg, transparent 180deg, ' + ac + ' 220deg, rgba(' + a + ', 0.5) 260deg, transparent 300deg, transparent 360deg)' }]} />}
+            {isNeon && <Animated.View style={[styles.neonGlowSpinnerPill, { transform: [{ rotate: cardSpinDeg }] }, Platform.OS === 'web' && { backgroundImage: 'conic-gradient(from 0deg, transparent 0deg, rgba(' + a + ', 0.4) 40deg, transparent 120deg, transparent 180deg, rgba(' + a + ', 0.4) 220deg, transparent 300deg, transparent 360deg)' }]} />}
+            <TouchableOpacity testID="chart-scanner-card" style={[styles.liquidInnerPill, !isNeon && { borderRadius: shapeRAdd, borderWidth: isCmd ? 2 : isLiquid ? 1.5 : 0.5, borderColor: isCmd ? cmdRed : isLiquid ? 'rgba(' + a + ', 0.4)' : 'rgba(255,255,255,0.08)' }, Platform.OS === 'web' && (isNeon ? { background: 'radial-gradient(ellipse 120% 40% at 30% 25%, rgba(255,255,255,0.25) 0%, transparent 70%), linear-gradient(180deg, rgba(' + a + ', 0.12) 0%, rgba(' + a + ', 0.08) 30%, rgba(0,0,0,0.6) 60%, rgba(0,0,0,0.8) 100%)', backdropFilter: 'blur(80px) saturate(200%)', WebkitBackdropFilter: 'blur(80px) saturate(200%)', boxShadow: 'inset 0 2px 8px rgba(255,255,255,0.25), inset 0 -4px 12px rgba(0,0,0,0.4), inset 0 40px 60px -20px rgba(255,255,255,0.08), 0 20px 60px rgba(0,0,0,0.6), 0 0 30px rgba(' + a + ', 0.2), 0 0 80px rgba(' + a + ', 0.08)' } : isLiquid ? { background: 'linear-gradient(135deg, rgba(255,255,255,0.08) 0%, rgba(255,255,255,0.03) 50%, rgba(0,0,0,0.4) 100%)', backdropFilter: 'blur(60px) saturate(180%)', WebkitBackdropFilter: 'blur(60px) saturate(180%)', boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.15), 0 0 8px rgba(' + a + ', 0.5), 0 0 20px rgba(' + a + ', 0.35), 0 0 40px rgba(' + a + ', 0.2), 0 0 70px rgba(' + a + ', 0.1)' } : isCmd ? { background: 'rgba(0,0,0,0.45)', backdropFilter: 'blur(20px)', WebkitBackdropFilter: 'blur(20px)', boxShadow: '0 0 10px rgba(' + cmdRedRgb + ', 0.3), 0 0 20px rgba(' + cmdRedRgb + ', 0.18), 0 6px 18px rgba(0,0,0,0.4)' } : { background: 'linear-gradient(180deg, rgba(255,255,255,0.04) 0%, rgba(0,0,0,0.5) 100%)', backdropFilter: 'blur(40px)', WebkitBackdropFilter: 'blur(40px)', boxShadow: 'inset 0 0.5px 0 rgba(255,255,255,0.1), 0 8px 24px rgba(0,0,0,0.4), 0 0 30px rgba(' + a + ', 0.35), 0 0 60px rgba(' + a + ', 0.15)' })]} onPress={tryScannerOpen} activeOpacity={0.7}>
+              {isNeon && renderBubbles(pillBubbles)}
+              {isNeon && <View style={[styles.refractionPill, Platform.OS === 'web' && { background: 'linear-gradient(180deg, rgba(255,255,255,0.18) 0%, rgba(255,255,255,0.06) 40%, transparent 100%)' }]} />}
+              {isNeon && <View style={[styles.meniscusPill, Platform.OS === 'web' && { background: 'radial-gradient(ellipse 60% 100% at 50% 0%, rgba(255,255,255,0.12) 0%, transparent 100%)' }]} />}
+              <BarChart3 color={cc} size={20} style={{ zIndex: 5 }} />
+              <View style={[styles.addEATextContainer, { zIndex: 5 }]}>
+                <Text style={styles.addEATitle}>CHART SCANNER</Text>
+                <Text style={styles.addEASubtitle}>AI-POWERED TRADE ANALYSIS</Text>
+              </View>
+            </TouchableOpacity>
+          </View>
+
+          {/* ========== 4. ADD A NEW EA ========== */}
+          <View style={[styles.neonWrapPill, !isNeon && { padding: 0 }, isPill && { alignSelf: 'center' as any }, (isLiquid || isMinimal) && Platform.OS === 'web' && { boxShadow: '0 0 4px rgba(' + a + ',0.7), 0 0 10px rgba(' + a + ',0.4), 0 0 25px rgba(' + a + ',0.2)', borderRadius: shapeRAdd + 2 } as any]}>
+            {isNeon && <Animated.View style={[styles.neonSpinnerPill, { transform: [{ rotate: cardSpinDeg }] }, Platform.OS === 'web' && { backgroundImage: 'conic-gradient(from 0deg, transparent 0deg, ' + ac + ' 40deg, rgba(' + a + ', 0.5) 80deg, transparent 120deg, transparent 180deg, ' + ac + ' 220deg, rgba(' + a + ', 0.5) 260deg, transparent 300deg, transparent 360deg)' }]} />}
+            {isNeon && <Animated.View style={[styles.neonGlowSpinnerPill, { transform: [{ rotate: cardSpinDeg }] }, Platform.OS === 'web' && { backgroundImage: 'conic-gradient(from 0deg, transparent 0deg, rgba(' + a + ', 0.4) 40deg, transparent 120deg, transparent 180deg, rgba(' + a + ', 0.4) 220deg, transparent 300deg, transparent 360deg)' }]} />}
+            <TouchableOpacity testID="add-ea-card" style={[styles.liquidInnerPill, !isNeon && { borderRadius: shapeRAdd, borderWidth: isCmd ? 2 : isLiquid ? 1.5 : 0.5, borderColor: isCmd ? cmdRed : isLiquid ? 'rgba(' + a + ', 0.4)' : 'rgba(255,255,255,0.08)' }, Platform.OS === 'web' && (isNeon ? { background: 'radial-gradient(ellipse 120% 40% at 30% 25%, rgba(255,255,255,0.25) 0%, transparent 70%), linear-gradient(180deg, rgba(' + a + ', 0.12) 0%, rgba(' + a + ', 0.08) 30%, rgba(0,0,0,0.6) 60%, rgba(0,0,0,0.8) 100%)', backdropFilter: 'blur(80px) saturate(200%)', WebkitBackdropFilter: 'blur(80px) saturate(200%)', boxShadow: 'inset 0 2px 8px rgba(255,255,255,0.25), inset 0 -4px 12px rgba(0,0,0,0.4), inset 0 40px 60px -20px rgba(255,255,255,0.08), 0 20px 60px rgba(0,0,0,0.6), 0 0 30px rgba(' + a + ', 0.2), 0 0 80px rgba(' + a + ', 0.08)' } : isLiquid ? { background: 'linear-gradient(135deg, rgba(255,255,255,0.08) 0%, rgba(255,255,255,0.03) 50%, rgba(0,0,0,0.4) 100%)', backdropFilter: 'blur(60px) saturate(180%)', WebkitBackdropFilter: 'blur(60px) saturate(180%)', boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.15), 0 0 8px rgba(' + a + ', 0.5), 0 0 20px rgba(' + a + ', 0.35), 0 0 40px rgba(' + a + ', 0.2), 0 0 70px rgba(' + a + ', 0.1)' } : isCmd ? { background: 'rgba(0,0,0,0.45)', backdropFilter: 'blur(20px)', WebkitBackdropFilter: 'blur(20px)', boxShadow: '0 0 10px rgba(' + cmdRedRgb + ', 0.3), 0 0 20px rgba(' + cmdRedRgb + ', 0.18), 0 6px 18px rgba(0,0,0,0.4)' } : { background: 'linear-gradient(180deg, rgba(255,255,255,0.04) 0%, rgba(0,0,0,0.5) 100%)', backdropFilter: 'blur(40px)', WebkitBackdropFilter: 'blur(40px)', boxShadow: 'inset 0 0.5px 0 rgba(255,255,255,0.1), 0 8px 24px rgba(0,0,0,0.4), 0 0 30px rgba(' + a + ', 0.35), 0 0 60px rgba(' + a + ', 0.15)' })]} onPress={handleAddNewEA} activeOpacity={0.7}>
+              {isNeon && renderBubbles(pillBubbles)}
+              {isNeon && <View style={[styles.refractionPill, Platform.OS === 'web' && { background: 'linear-gradient(180deg, rgba(255,255,255,0.18) 0%, rgba(255,255,255,0.06) 40%, transparent 100%)' }]} />}
+              {isNeon && <View style={[styles.meniscusPill, Platform.OS === 'web' && { background: 'radial-gradient(ellipse 60% 100% at 50% 0%, rgba(255,255,255,0.12) 0%, transparent 100%)' }]} />}
+              <Plus color={cc} size={20} style={{ zIndex: 5 }} />
+              <View style={[styles.addEATextContainer, { zIndex: 5 }]}>
+                <Text style={styles.addEATitle}>ADD A NEW EA</Text>
+                <Text style={styles.addEASubtitle}>HAVE A VALID LICENSE KEY</Text>
+              </View>
+            </TouchableOpacity>
+          </View>
 
           </View>}
 
@@ -604,6 +690,30 @@ export default function HomeScreen() {
           </View>
         </View>
       )}
+
+      {/* SETUP REQUIRED (as on TradePort): Trade or Scan with no MT5 account connected. */}
+      <Modal visible={!!setupMsg} transparent animationType="fade" onRequestClose={() => setSetupMsg(null)}>
+        <View style={styles.setupOverlay}>
+          <View style={[styles.setupCard, { borderColor: cc + '66' }, Platform.OS === 'web' && ({ boxShadow: '0 0 30px 8px ' + cc + '33' } as any)]}>
+            <View style={[styles.setupIcon, { borderColor: cc, backgroundColor: cc + '22' }]}>
+              <Shield color={cc} size={28} />
+            </View>
+            <Text style={styles.setupTitle}>SETUP REQUIRED</Text>
+            <Text style={styles.setupMessage}>{setupMsg}</Text>
+            <TouchableOpacity
+              testID="setup-connect"
+              activeOpacity={0.8}
+              onPress={() => { setSetupMsg(null); router.push('/metatrader'); }}
+              style={[styles.setupButton, { backgroundColor: cc }]}
+            >
+              <Text style={styles.setupButtonText}>CONNECT ACCOUNT</Text>
+            </TouchableOpacity>
+            <TouchableOpacity activeOpacity={0.7} onPress={() => setSetupMsg(null)} style={{ paddingVertical: 10 }}>
+              <Text style={styles.setupCancel}>Cancel</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
 
       <QuickConfigModal
         visible={showConfigModal}
@@ -1354,6 +1464,20 @@ const styles = StyleSheet.create({
     letterSpacing: 1,
     marginTop: 4,
   },
+  eaInfoDetail: { fontSize: 10, color: 'rgba(255,255,255,0.5)', marginTop: 2 },
+  eaInfoActions: { flexDirection: 'row', gap: 8, marginLeft: 8, zIndex: 1 },
+  eaInfoIconBtn: {
+    width: 34, height: 34, borderRadius: 17, borderWidth: 1,
+    alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(0,0,0,0.35)',
+  },
+  setupOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.75)', justifyContent: 'center', alignItems: 'center', paddingHorizontal: 24 },
+  setupCard: { backgroundColor: '#0A0F1C', borderRadius: 20, borderWidth: 1, padding: 28, width: '100%', maxWidth: 380, alignItems: 'center' },
+  setupIcon: { width: 56, height: 56, borderRadius: 28, borderWidth: 2, alignItems: 'center', justifyContent: 'center', marginBottom: 16 },
+  setupTitle: { color: '#FFFFFF', fontSize: 18, fontWeight: '800', letterSpacing: 1, marginBottom: 8, textAlign: 'center' },
+  setupMessage: { color: 'rgba(255,255,255,0.7)', fontSize: 14, textAlign: 'center', lineHeight: 20, marginBottom: 24 },
+  setupButton: { borderRadius: 12, paddingVertical: 14, paddingHorizontal: 32, width: '100%', alignItems: 'center', marginBottom: 10 },
+  setupButtonText: { color: '#000000', fontSize: 14, fontWeight: '800', letterSpacing: 1 },
+  setupCancel: { color: 'rgba(255,255,255,0.4)', fontSize: 13, fontWeight: '600' },
 
   /* ========== REMOVE WARNING MODAL ========== */
   modalOverlay: {

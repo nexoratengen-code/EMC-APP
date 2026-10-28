@@ -900,7 +900,8 @@ export const [AppProvider, useApp] = createContextHook<AppState>(() => {
   const [isTestFlightRunning, setIsTestFlightRunning] = useState<boolean>(false);
   const testFlightPollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
-  const refreshTestFlight = useCallback(async (): Promise<boolean> => {
+  // true running, false not running, null no answer (network): callers must not treat null as stopped.
+  const refreshTestFlight = useCallback(async (): Promise<boolean | null> => {
     const uuid = mt5Account?.uuid;
     if (!uuid) return false;
     try {
@@ -913,7 +914,7 @@ export const [AppProvider, useApp] = createContextHook<AppState>(() => {
       setIsTestFlightRunning(false);
       setTestFlightStatus(null);
       return false;
-    } catch { return false; }
+    } catch { return null; }
   }, [mt5Account?.uuid]);
 
   const ensureTestFlightPolling = useCallback(() => {
@@ -964,10 +965,19 @@ export const [AppProvider, useApp] = createContextHook<AppState>(() => {
   }, [mt5Account?.uuid, refreshTestFlight, ensureTestFlightPolling]);
 
   // Restore on app open: if the server already has a flight running, reflect it
-  // (close & reopen the app → the loop is still going on the backend).
+  // (close & reopen the app → the loop is still going on the backend). If the
+  // server says it is NOT running, the Trade button must not keep saying STOP
+  // from a stale saved flag (28 Oct 2026, as TradePort syncs to its server).
   useEffect(() => {
     if (mt5Account?.uuid) {
-      refreshTestFlight().then((running) => { if (running) ensureTestFlightPolling(); });
+      refreshTestFlight().then((running) => {
+        if (running) { ensureTestFlightPolling(); return; }
+        if (running === null) return; // no answer: leave things as they are
+        setIsBotActive((was) => {
+          if (was) AsyncStorage.setItem('isBotActive', JSON.stringify(false)).catch(() => {});
+          return false;
+        });
+      });
     }
   }, [mt5Account?.uuid, refreshTestFlight, ensureTestFlightPolling]);
 
