@@ -3,9 +3,11 @@ import { useState, useEffect, useCallback } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 export type ThemeName = 'pink' | 'gold' | 'silver' | 'white' | 'teal' | 'lime' | 'magenta' | 'crimson' | 'violet' | 'amber';
-export type GlassMode = 'neon' | 'minimal' | 'liquid' | 'commander' | 'mech';
+export type GlassMode = 'neon' | 'minimal' | 'liquid' | 'commander' | 'mech' | 'abyss';
 export type FontFamily = 'system' | 'mono' | 'rounded' | 'condensed' | 'serif' | 'grotesk' | 'jetbrains' | 'outfit' | 'sora' | 'tight';
 export type HeroStyle = 'square' | 'circle';
+/** Where the Abyss home puts the EA picture (dev's ask, 28 Oct 2026). */
+export type PictureAlign = 'left' | 'center' | 'right';
 export type TextCase = 'normal' | 'upper' | 'lower' | 'capitalize';
 export type BgType = 'robot' | 'video1' | 'video2' | 'video3' | 'video4' | 'custom' | 'off';
 export type CardBgMode = 'thumbnail' | 'fullcover';
@@ -28,7 +30,7 @@ const TEXT_CASE_MAP: Record<TextCase, string> = {
   normal: 'none', upper: 'uppercase', lower: 'lowercase', capitalize: 'capitalize',
 };
 
-const GOOGLE_FONTS_URL = 'https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500;600;700&family=Nunito:wght@400;600;700;800;900&family=Roboto+Condensed:wght@400;500;600;700;800&family=Playfair+Display:wght@400;600;700;800;900&family=Space+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&family=Outfit:wght@400;500;600;700;800;900&family=Sora:wght@400;500;600;700;800&family=Inter+Tight:wght@400;500;600;700;800;900&display=swap';
+const GOOGLE_FONTS_URL = 'https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500;600;700&family=Nunito:wght@400;600;700;800;900&family=Roboto+Condensed:wght@400;500;600;700;800&family=Playfair+Display:wght@400;600;700;800;900&family=Space+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&family=Outfit:wght@400;500;600;700;800;900&family=Sora:wght@200;300;400;500;600;700;800&family=Inter+Tight:wght@400;500;600;700;800;900&display=swap';
 
 export interface ThemeColors {
   accent: string; accentRgb: string; accentLight: string; accentGlow: string; gradientStart: string; textMuted: string;
@@ -51,6 +53,8 @@ const THEME_STORAGE_KEY = 'tradeport_theme';
 const GLASS_STORAGE_KEY = 'tradeport_glass_mode';
 const FONT_STORAGE_KEY = 'tradeport_font';
 const HERO_STORAGE_KEY = 'tradeport_hero_style';
+const PICTURE_ALIGN_KEY = 'emc_picture_align';
+const PICTURE_BG_KEY = 'emc_picture_background';
 const CASE_STORAGE_KEY = 'tradeport_text_case';
 const BG_STORAGE_KEY = 'tradeport_bg_type';
 const CARDBG_STORAGE_KEY = 'tradeport_card_bg';
@@ -84,6 +88,9 @@ export interface ThemeState {
   glassMode: GlassMode; setGlassMode: (mode: GlassMode) => void;
   fontFamily: FontFamily; fontFamilyCSS: string; setFontFamily: (f: FontFamily) => void;
   heroStyle: HeroStyle; setHeroStyle: (h: HeroStyle) => void;
+  pictureAlign: PictureAlign; setPictureAlign: (a: PictureAlign) => void;
+  /** Abyss home: show the EA picture as a soft full background instead of the small circle. */
+  pictureBackground: boolean; setPictureBackground: (on: boolean) => void;
   textCase: TextCase; textCaseCSS: string; setTextCase: (t: TextCase) => void;
   bgType: BgType; setBgType: (b: BgType) => void;
   cardBgMode: CardBgMode; setCardBgMode: (c: CardBgMode) => void;
@@ -93,9 +100,12 @@ export interface ThemeState {
 
 export const [ThemeProvider, useTheme] = createContextHook<ThemeState>(() => {
   const [themeName, setThemeNameState] = useState<ThemeName>('violet');
-  const [glassMode, setGlassModeState] = useState<GlassMode>('commander');
+  // New members get the Abyss look (28 Oct 2026); a style someone picked is kept.
+  const [glassMode, setGlassModeState] = useState<GlassMode>('abyss');
   const [fontFamily, setFontFamilyState] = useState<FontFamily>('system');
   const [heroStyle, setHeroStyleState] = useState<HeroStyle>('circle');
+  const [pictureAlign, setPictureAlignState] = useState<PictureAlign>('left');
+  const [pictureBackground, setPictureBackgroundState] = useState<boolean>(false);
   const [textCase, setTextCaseState] = useState<TextCase>('normal');
   const [bgType, setBgTypeState] = useState<BgType>('robot');
   const [cardBgMode, setCardBgModeState] = useState<CardBgMode>('thumbnail');
@@ -104,9 +114,11 @@ export const [ThemeProvider, useTheme] = createContextHook<ThemeState>(() => {
 
   useEffect(() => {
     AsyncStorage.getItem(THEME_STORAGE_KEY).then((s) => { if (s && s in THEMES) setThemeNameState(s as ThemeName); }).catch(() => {});
-    AsyncStorage.getItem(GLASS_STORAGE_KEY).then((s) => { if (s === 'neon' || s === 'minimal' || s === 'liquid' || s === 'commander' || s === 'mech') setGlassModeState(s); }).catch(() => {});
+    AsyncStorage.getItem(GLASS_STORAGE_KEY).then((s) => { if (s === 'neon' || s === 'minimal' || s === 'liquid' || s === 'commander' || s === 'mech' || s === 'abyss') setGlassModeState(s); }).catch(() => {});
     AsyncStorage.getItem(FONT_STORAGE_KEY).then((s) => { if (s && s in FONT_MAP) setFontFamilyState(s as FontFamily); }).catch(() => {});
     AsyncStorage.getItem(HERO_STORAGE_KEY).then((s) => { if (s === 'square' || s === 'circle') setHeroStyleState(s); }).catch(() => {});
+    AsyncStorage.getItem(PICTURE_ALIGN_KEY).then((s) => { if (s === 'left' || s === 'center' || s === 'right') setPictureAlignState(s); }).catch(() => {});
+    AsyncStorage.getItem(PICTURE_BG_KEY).then((s) => { if (s === '1' || s === '0') setPictureBackgroundState(s === '1'); }).catch(() => {});
     AsyncStorage.getItem(CASE_STORAGE_KEY).then((s) => { if (s && s in TEXT_CASE_MAP) setTextCaseState(s as TextCase); }).catch(() => {});
     AsyncStorage.getItem(BG_STORAGE_KEY).then((s) => { if (s === 'robot' || s === 'video1' || s === 'video2' || s === 'video3' || s === 'video4' || s === 'custom' || s === 'off') setBgTypeState(s); }).catch(() => {});
     AsyncStorage.getItem(CARDBG_STORAGE_KEY).then((s) => { if (s === 'thumbnail' || s === 'fullcover') setCardBgModeState(s); }).catch(() => {});
@@ -126,6 +138,8 @@ export const [ThemeProvider, useTheme] = createContextHook<ThemeState>(() => {
   const setGlassMode = useCallback((mode: GlassMode) => { setGlassModeState(mode); AsyncStorage.setItem(GLASS_STORAGE_KEY, mode).catch(() => {}); }, []);
   const setFontFamily = useCallback((f: FontFamily) => { setFontFamilyState(f); AsyncStorage.setItem(FONT_STORAGE_KEY, f).catch(() => {}); }, []);
   const setHeroStyle = useCallback((h: HeroStyle) => { setHeroStyleState(h); AsyncStorage.setItem(HERO_STORAGE_KEY, h).catch(() => {}); }, []);
+  const setPictureAlign = useCallback((a: PictureAlign) => { setPictureAlignState(a); AsyncStorage.setItem(PICTURE_ALIGN_KEY, a).catch(() => {}); }, []);
+  const setPictureBackground = useCallback((on: boolean) => { setPictureBackgroundState(on); AsyncStorage.setItem(PICTURE_BG_KEY, on ? '1' : '0').catch(() => {}); }, []);
   const setTextCase = useCallback((t: TextCase) => { setTextCaseState(t); AsyncStorage.setItem(CASE_STORAGE_KEY, t).catch(() => {}); }, []);
   const setBgType = useCallback((b: BgType) => { setBgTypeState(b); AsyncStorage.setItem(BG_STORAGE_KEY, b).catch(() => {}); }, []);
   const setCardBgMode = useCallback((c: CardBgMode) => { setCardBgModeState(c); AsyncStorage.setItem(CARDBG_STORAGE_KEY, c).catch(() => {}); }, []);
@@ -133,10 +147,11 @@ export const [ThemeProvider, useTheme] = createContextHook<ThemeState>(() => {
   const setGlowColor = useCallback((c: string) => { setGlowColorState(c); AsyncStorage.setItem(GLOW_STORAGE_KEY, JSON.stringify(c)).catch(() => {}); }, []);
 
   const theme = buildEffectiveTheme(THEMES[themeName], glowColor);
-  const fontFamilyCSS = FONT_MAP[fontFamily];
+  // Abyss is designed around Sora, so it brings its own font with it.
+  const fontFamilyCSS = glassMode === 'abyss' ? FONT_MAP.sora : FONT_MAP[fontFamily];
   const textCaseCSS = TEXT_CASE_MAP[textCase];
 
-  return { themeName, theme, setThemeName, glassMode, setGlassMode, fontFamily, fontFamilyCSS, setFontFamily, heroStyle, setHeroStyle, textCase, textCaseCSS, setTextCase, bgType, setBgType, cardBgMode, setCardBgMode, cardShape, setCardShape, glowColor, setGlowColor };
+  return { themeName, theme, setThemeName, glassMode, setGlassMode, fontFamily, fontFamilyCSS, setFontFamily, heroStyle, setHeroStyle, pictureAlign, setPictureAlign, pictureBackground, setPictureBackground, textCase, textCaseCSS, setTextCase, bgType, setBgType, cardBgMode, setCardBgMode, cardShape, setCardShape, glowColor, setGlowColor };
 });
 
 export { THEMES, FONT_MAP, TEXT_CASE_MAP, GOOGLE_FONTS_URL };

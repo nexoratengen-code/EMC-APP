@@ -1,8 +1,10 @@
 import createContextHook from '@nkzw/create-context-hook';
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { Platform, Alert } from 'react-native';
-import { LicenseData, apiService } from '@/services/api';
+import { Platform, Alert, AppState } from 'react-native';
+import {
+  LicenseData, apiService, getMemberSession, clearMemberSession, checkMemberSessionRemote, SIGNED_OUT_REASON_KEY,
+} from '@/services/api';
 import signalsMonitor, { SignalLog } from '@/services/signals-monitor';
 import databaseSignalsPollingService, { DatabaseSignal } from '@/services/database-signals-polling';
 import { mqttSignalsService } from '@/services/mqtt-signals';
@@ -414,6 +416,59 @@ export const [AppProvider, useApp] = createContextHook<AppState>(() => {
       console.error('Error saving user:', error);
     }
   }, []);
+
+  // ── MEMBER SESSION CHECK ON EVERY OPEN (28 Oct 2026) ──
+  // EMC's server decides, not this device: the stored session is sent to
+  // /api/auth/session/ and only its answer can sign someone out. A member who
+  // signed in on another device since (newest sign-in wins), or whose account
+  // is no longer paid, is signed out here. Network trouble keeps them in.
+  const verifyingRef = useRef(false);
+  const verifySession = useCallback(async () => {
+    const email = user?.email;
+    if (!email || verifyingRef.current) return;
+    verifyingRef.current = true;
+    const signOut = async (reason: string) => {
+      console.log('Session not valid, signing out:', reason);
+      setUserState(null);
+      setEAs([]);
+      await AsyncStorage.multiRemove(['user', 'eas']).catch(() => {});
+      await clearMemberSession();
+      await AsyncStorage.setItem(SIGNED_OUT_REASON_KEY, reason).catch(() => {});
+    };
+    try {
+      let session = await getMemberSession();
+      if (!session) {
+        // Signed in before sessions existed: get one quietly with the stored
+        // email. Only the account itself (gone or unpaid) can sign them out.
+        const account = await apiService.authenticate({ email });
+        if (account.status === 'not_found' || !account.paid) {
+          await signOut('not_found');
+          return;
+        }
+        session = await getMemberSession();
+        if (!session) return;
+      }
+      const verdict = await checkMemberSessionRemote(email, session);
+      if (!verdict || verdict.ok) return;
+      if (verdict.reason === 'signed_in_elsewhere' || verdict.reason === 'unpaid' || verdict.reason === 'not_found') {
+        await signOut(verdict.reason);
+      }
+      // Anything else (no_session) is about the session, not the member: keep them in.
+    } catch (e) {
+      console.warn('Session check skipped (network):', e);
+    } finally {
+      verifyingRef.current = false;
+    }
+  }, [user?.email]);
+
+  useEffect(() => {
+    if (!isHydrated || !user?.email) return;
+    verifySession();
+    const sub = AppState.addEventListener('change', (state) => {
+      if (state === 'active') verifySession();
+    });
+    return () => sub.remove();
+  }, [isHydrated, user?.email, verifySession]);
 
   const addEA = useCallback(async (ea: EA) => {
     try {
@@ -900,7 +955,8 @@ export const [AppProvider, useApp] = createContextHook<AppState>(() => {
   const [isTestFlightRunning, setIsTestFlightRunning] = useState<boolean>(false);
   const testFlightPollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
-  const refreshTestFlight = useCallback(async (): Promise<boolean> => {
+  // true running, false not running, null no answer (network): callers must not treat null as stopped.
+  const refreshTestFlight = useCallback(async (): Promise<boolean | null> => {
     const uuid = mt5Account?.uuid;
     if (!uuid) return false;
     try {
@@ -913,7 +969,7 @@ export const [AppProvider, useApp] = createContextHook<AppState>(() => {
       setIsTestFlightRunning(false);
       setTestFlightStatus(null);
       return false;
-    } catch { return false; }
+    } catch { return null; }
   }, [mt5Account?.uuid]);
 
   const ensureTestFlightPolling = useCallback(() => {
@@ -964,10 +1020,19 @@ export const [AppProvider, useApp] = createContextHook<AppState>(() => {
   }, [mt5Account?.uuid, refreshTestFlight, ensureTestFlightPolling]);
 
   // Restore on app open: if the server already has a flight running, reflect it
-  // (close & reopen the app → the loop is still going on the backend).
+  // (close & reopen the app → the loop is still going on the backend). If the
+  // server says it is NOT running, the Trade button must not keep saying STOP
+  // from a stale saved flag (28 Oct 2026, as TradePort syncs to its server).
   useEffect(() => {
     if (mt5Account?.uuid) {
-      refreshTestFlight().then((running) => { if (running) ensureTestFlightPolling(); });
+      refreshTestFlight().then((running) => {
+        if (running) { ensureTestFlightPolling(); return; }
+        if (running === null) return; // no answer: leave things as they are
+        setIsBotActive((was) => {
+          if (was) AsyncStorage.setItem('isBotActive', JSON.stringify(false)).catch(() => {});
+          return false;
+        });
+      });
     }
   }, [mt5Account?.uuid, refreshTestFlight, ensureTestFlightPolling]);
 

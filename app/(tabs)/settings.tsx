@@ -6,6 +6,7 @@ import { AnimatedButton } from '@/components/animated-button';
 import { useApp } from '@/providers/app-provider';
 import { useSidebar } from '@/providers/sidebar-provider';
 import { Menu } from 'lucide-react-native';
+import { AbyssSettings } from '@/components/abyss-settings';
 
 const THEME_OPTIONS: { name: ThemeName; label: string; preview: string }[] = [
   { name: 'pink',    label: 'Pink',    preview: '#FF4DA6' },
@@ -21,7 +22,7 @@ const THEME_OPTIONS: { name: ThemeName; label: string; preview: string }[] = [
 ];
 
 export default function SettingsScreen() {
-  const { themeName, theme, setThemeName, glassMode, setGlassMode, fontFamily, setFontFamily, heroStyle, setHeroStyle, textCase, setTextCase, bgType, setBgType, cardBgMode, setCardBgMode, cardShape, setCardShape } = useTheme();
+  const { themeName, theme, setThemeName, glassMode, setGlassMode, fontFamily, setFontFamily, heroStyle, setHeroStyle, textCase, setTextCase, bgType, setBgType, cardBgMode, setCardBgMode, cardShape, setCardShape, glowColor, setGlowColor } = useTheme();
   const { eas } = useApp();
   const { toggle: toggleSidebar } = useSidebar();
   const primaryEA = eas.length > 0 ? eas[0] : null;
@@ -35,6 +36,10 @@ export default function SettingsScreen() {
   const isNeon = glassMode === 'neon';
   const isLiquid = glassMode === 'liquid';
   const isCmd = glassMode === 'commander';
+
+  if (glassMode === 'abyss') {
+    return <AbyssSettings glassMode={glassMode} setGlassMode={setGlassMode} glowColor={glowColor} setGlowColor={setGlowColor} onMenu={toggleSidebar} />;
+  }
 
   return (
     <SafeAreaView style={[styles.container, Platform.OS === 'web' && { backgroundImage: isNeon ? 'linear-gradient(135deg, rgba(' + theme.accentRgb + ', 0.7) 0%, rgba(' + theme.accentRgb + ', 0.3) 25%, rgba(0,0,0,0.85) 55%, #000 100%)' : isLiquid ? 'linear-gradient(160deg, #1a1a1e 0%, #111113 40%, #0a0a0c 100%)' : 'none' }]}>
@@ -80,10 +85,10 @@ export default function SettingsScreen() {
         <Text style={[styles.sectionLabel, { marginTop: 32 }]}>GLASS STYLE</Text>
         <View style={[styles.glassCard, { borderColor: 'rgba(' + theme.accentRgb + ', 0.2)' }]}>
           <Text style={[styles.cardSubtitle, { marginBottom: 14 }]}>
-            {glassMode === 'neon' ? 'Neon glow with spinning borders' : glassMode === 'minimal' ? 'Dark glass with accent aura' : glassMode === 'liquid' ? 'Frosted translucent iOS glass' : glassMode === 'mech' ? 'Robot background with voice circle' : 'Commander with robot background'}
+            {glassMode === 'neon' ? 'Neon glow with spinning borders' : glassMode === 'minimal' ? 'Dark glass with accent aura' : glassMode === 'liquid' ? 'Frosted translucent iOS glass' : glassMode === 'mech' ? 'Robot background with voice circle' : glassMode === 'abyss' ? 'Deep navy with blue glass' : 'Commander with robot background'}
           </Text>
           <View style={styles.glassSegmented}>
-            {(['neon', 'minimal', 'liquid', 'commander', 'mech'] as const).map((m) => {
+            {(['neon', 'minimal', 'liquid', 'commander', 'mech', 'abyss'] as const).map((m) => {
               const active = glassMode === m;
               return (
                 <AnimatedButton
@@ -94,7 +99,7 @@ export default function SettingsScreen() {
                   style={styles.glassSeg}
                   onPress={() => setGlassMode(m)}
                 >
-                  <Text style={[styles.glassSegText, active && { color: theme.accent }]}>{m === 'neon' ? 'Neon' : m === 'minimal' ? 'Minimal' : m === 'liquid' ? 'Liquid' : m === 'mech' ? 'Mech' : 'Commander'}</Text>
+                  <Text style={[styles.glassSegText, active && { color: theme.accent }]}>{m === 'neon' ? 'Neon' : m === 'minimal' ? 'Minimal' : m === 'liquid' ? 'Liquid' : m === 'mech' ? 'Mech' : m === 'abyss' ? 'Abyss' : 'Commander'}</Text>
                 </AnimatedButton>
               );
             })}
