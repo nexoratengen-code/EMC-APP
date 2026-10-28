@@ -25,6 +25,21 @@ export async function clearMemberSession(): Promise<void> {
   try { await AsyncStorage.removeItem(MEMBER_SESSION_KEY); } catch {}
 }
 
+/**
+ * Robot API calls carry the member session (28 Oct 2026): EMC's app server
+ * refuses /api/mt5/* without it, so nobody can drive MT5 without a paid sign-in.
+ */
+async function mt5Fetch(url: string, init: RequestInit = {}): Promise<Response> {
+  const headers = new Headers(init.headers || {});
+  try {
+    const [session, rawUser] = await Promise.all([getMemberSession(), AsyncStorage.getItem('user')]);
+    const email = rawUser ? String(JSON.parse(rawUser)?.email || '') : '';
+    if (session) headers.set('Authorization', `Bearer ${session}`);
+    if (email) headers.set('X-EMC-Email', email.normalize('NFKC').trim().toLowerCase());
+  } catch {}
+  return fetch(url, { ...init, headers });
+}
+
 export type SessionVerdict = { ok: true } | { ok: false; reason: string };
 
 /**
@@ -307,7 +322,7 @@ class ApiService {
   async connectMT5(params: MT5ConnectBody): Promise<{ uuid: string }> {
     const { server, login, password, name } = params;
     const endpoint = `${this.getServerBase()}/api/mt5/connect`;
-    const res = await fetch(endpoint, {
+    const res = await mt5Fetch(endpoint, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ server, login, password, name }),
@@ -327,7 +342,7 @@ class ApiService {
 
   async disconnectMT5(uuid: string): Promise<{ message: string }> {
     const endpoint = `${this.getServerBase()}/api/mt5/connect?id=${encodeURIComponent(uuid)}`;
-    const res = await fetch(endpoint, { method: 'DELETE' });
+    const res = await mt5Fetch(endpoint, { method: 'DELETE' });
     const data = await res.json();
     if (!res.ok) throw new Error(data?.error || 'Failed to disconnect');
     return data;
@@ -336,7 +351,7 @@ class ApiService {
   // Verify + silently re-establish the session behind `uuid` under the same id.
   async reconnectMT5(uuid: string, server: string, login: string, password: string): Promise<{ uuid: string; reconnected: boolean }> {
     const endpoint = `${this.getServerBase()}/api/mt5/reconnect`;
-    const res = await fetch(endpoint, {
+    const res = await mt5Fetch(endpoint, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ id: uuid, server, login, password }),
@@ -348,7 +363,7 @@ class ApiService {
 
   async getMT5AccountSummary(uuid: string): Promise<any> {
     const endpoint = `${this.getServerBase()}/api/mt5/account?id=${encodeURIComponent(uuid)}`;
-    const res = await fetch(endpoint);
+    const res = await mt5Fetch(endpoint);
     const data = await res.json();
     if (!res.ok) throw new Error(data?.error || 'Failed to fetch account');
     return data;
@@ -356,7 +371,7 @@ class ApiService {
 
   async getMT5Orders(uuid: string, type: 'open' | 'closed' | 'all' = 'open'): Promise<any> {
     const endpoint = `${this.getServerBase()}/api/mt5/orders?id=${encodeURIComponent(uuid)}&type=${type}`;
-    const res = await fetch(endpoint);
+    const res = await mt5Fetch(endpoint);
     const data = await res.json();
     if (!res.ok) throw new Error(data?.error || 'Failed to fetch orders');
     return data;
@@ -377,7 +392,7 @@ class ApiService {
     lots?: number;
   }): Promise<any> {
     const endpoint = `${this.getServerBase()}/api/mt5/trade`;
-    const res = await fetch(endpoint, {
+    const res = await mt5Fetch(endpoint, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(params),
@@ -389,7 +404,7 @@ class ApiService {
 
   async getMT5Symbols(uuid: string): Promise<string[]> {
     const endpoint = `${this.getServerBase()}/api/mt5/symbols?id=${encodeURIComponent(uuid)}&action=list`;
-    const res = await fetch(endpoint);
+    const res = await mt5Fetch(endpoint);
     const data = await res.json();
     if (!res.ok) throw new Error(data?.error || 'Failed to fetch symbols');
     return data;
@@ -397,7 +412,7 @@ class ApiService {
 
   async getMT5Quote(uuid: string, symbol: string): Promise<any> {
     const endpoint = `${this.getServerBase()}/api/mt5/symbols?id=${encodeURIComponent(uuid)}&action=quote&symbol=${encodeURIComponent(symbol)}`;
-    const res = await fetch(endpoint);
+    const res = await mt5Fetch(endpoint);
     const data = await res.json();
     if (!res.ok) throw new Error(data?.error || 'Failed to fetch quote');
     return data;
@@ -407,7 +422,7 @@ class ApiService {
     const params = new URLSearchParams({ id: uuid, action: 'watch' });
     for (const s of symbols) params.append('symbols', s);
     const endpoint = `${this.getServerBase()}/api/mt5/symbols?${params.toString()}`;
-    const res = await fetch(endpoint);
+    const res = await mt5Fetch(endpoint);
     const data = await res.json();
     if (!res.ok) throw new Error(data?.error || 'Failed to fetch market watch');
     return data;
@@ -419,7 +434,7 @@ class ApiService {
    * its own direction and rotation clock; lot and trade count apply to each.
    */
   async startTestFlight(uuid: string, opts: { symbols: string[]; volume: number; count: number; intervalMinutes: number; comment?: string }): Promise<any> {
-    const res = await fetch(`${this.getServerBase()}/api/mt5/testflight/start`, {
+    const res = await mt5Fetch(`${this.getServerBase()}/api/mt5/testflight/start`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ id: uuid, ...opts }),
@@ -430,7 +445,7 @@ class ApiService {
   }
 
   async stopTestFlight(uuid: string): Promise<any> {
-    const res = await fetch(`${this.getServerBase()}/api/mt5/testflight/stop`, {
+    const res = await mt5Fetch(`${this.getServerBase()}/api/mt5/testflight/stop`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ id: uuid }),
@@ -441,7 +456,7 @@ class ApiService {
   }
 
   async getTestFlightStatus(uuid: string): Promise<any> {
-    const res = await fetch(`${this.getServerBase()}/api/mt5/testflight/status?id=${encodeURIComponent(uuid)}`);
+    const res = await mt5Fetch(`${this.getServerBase()}/api/mt5/testflight/status?id=${encodeURIComponent(uuid)}`);
     const data = await res.json();
     if (!res.ok) throw new Error(data?.error || 'Failed to get test flight status');
     return data;
@@ -536,7 +551,7 @@ export async function scheduleNewsTrade(params: {
   /** Optional: compress the settling window, for a test flight. */
   followSeconds?: number;
 }): Promise<NewsSchedule> {
-  const res = await fetch(`${apiService.serverBase()}/api/news/schedule`, {
+  const res = await mt5Fetch(`${apiService.serverBase()}/api/news/schedule`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
@@ -554,7 +569,7 @@ export async function scheduleNewsTrade(params: {
 
 export async function getNewsSchedules(uuid: string): Promise<NewsSchedule[]> {
   try {
-    const res = await fetch(`${apiService.serverBase()}/api/news/schedule?id=${encodeURIComponent(uuid)}`);
+    const res = await mt5Fetch(`${apiService.serverBase()}/api/news/schedule?id=${encodeURIComponent(uuid)}`);
     if (!res.ok) return [];
     const data = await res.json();
     return Array.isArray(data?.schedules) ? data.schedules : [];
@@ -564,7 +579,7 @@ export async function getNewsSchedules(uuid: string): Promise<NewsSchedule[]> {
 export async function cancelNewsSchedule(uuid: string, eventId: string, symbol: string): Promise<boolean> {
   try {
     const qs = `id=${encodeURIComponent(uuid)}&event_id=${encodeURIComponent(eventId)}&symbol=${encodeURIComponent(symbol)}`;
-    const res = await fetch(`${apiService.serverBase()}/api/news/schedule?${qs}`, { method: 'DELETE' });
+    const res = await mt5Fetch(`${apiService.serverBase()}/api/news/schedule?${qs}`, { method: 'DELETE' });
     const data = await res.json().catch(() => ({}));
     return !!data?.ok;
   } catch { return false; }

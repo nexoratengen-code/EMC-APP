@@ -1352,6 +1352,10 @@ async function handleApi(request: Request): Promise<Response> {
 
   try {
     if (pathname === '/api/news/schedule') {
+      // It schedules real orders on an account, so it takes the same lock as /api/mt5/*.
+      const { memberGate } = await import('./server-routes/member-gate.ts');
+      const refused = await memberGate(request);
+      if (refused) return refused;
       const route = await import('./app/api/news/schedule/route.ts');
       const fn = (route as any)[request.method];
       if (typeof fn === 'function') return fn(request) as Promise<Response>;
@@ -1559,6 +1563,13 @@ async function handleApi(request: Request): Promise<Response> {
     }
 
     // ── Api2Trade MT5 routes ─────────────────────────────────
+    // A paid member's session is required (28 Oct 2026); see server-routes/member-gate.ts.
+    if (pathname.startsWith('/api/mt5/')) {
+      const { memberGate } = await import('./server-routes/member-gate.ts');
+      const refused = await memberGate(request);
+      if (refused) return refused;
+    }
+
     if (pathname === '/api/mt5/connect') {
       const route = await import('./app/api/mt5/connect/route.ts');
       if (request.method === 'POST' && typeof route.POST === 'function') {

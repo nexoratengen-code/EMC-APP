@@ -23,11 +23,29 @@ function getAuthHeaders(): Record<string, string> {
   throw new Error('Api2Trade credentials not configured');
 }
 
+// ── Session handles ─────────────────────────────────────────
+//
+// The app and the robots know an account by the uuid it was first connected
+// under. Api2Trade can kill the session behind that uuid for good (27 Oct 2026,
+// 22:30 SAST, TradePort: every uuid answered 503 "upstream connect error ...
+// connection refused" and re-auth under the same uuid failed the same way,
+// while EA Converter, which opens a FRESH session when the old one is dead,
+// kept trading). So a handle can point at a newer Api2Trade session: every
+// call made with the handle goes to the session it maps to. In memory only:
+// after a restart the app's reconnect on open maps it again. Ported from
+// TradePort #35, 28 Oct 2026.
+const liveSession = new Map<string, string>();
+
+/** The Api2Trade session to use for a handle (the handle itself unless it was moved). */
+export function sessionFor(id: string): string {
+  return liveSession.get(id) ?? id;
+}
+
 async function api2tradeGet<T = any>(path: string, params: Record<string, string | number | boolean> = {}): Promise<T> {
   const url = new URL(`${API2TRADE_BASE}/${path}`);
   for (const [k, v] of Object.entries(params)) {
     if (v !== undefined && v !== null && v !== '') {
-      url.searchParams.set(k, String(v));
+      url.searchParams.set(k, k === 'id' ? sessionFor(String(v)) : String(v));
     }
   }
 
@@ -91,7 +109,11 @@ export async function connectEx(
 }
 
 export async function disconnect(id: string): Promise<{ message: string }> {
-  return api2tradeGet('Disconnect', { id });
+  try {
+    return await api2tradeGet('Disconnect', { id });
+  } finally {
+    liveSession.delete(id);
+  }
 }
 
 export async function checkConnect(id: string): Promise<any> {
@@ -117,27 +139,61 @@ export async function getAccountSummary(id: string): Promise<AccountSummary> {
 }
 
 // Verify the session behind `id` is live and, if not, silently re-establish it
-// under the SAME id from stored credentials. The account-summary probe IS the
-// real source of truth (a live session returns leverage > 0). CheckConnect is
-// written but not trusted here — the probe's success is what actually matters.
+// from stored credentials: first under the session it already uses, and when
+// that session is dead for good, under a FRESH Api2Trade session that `id` then
+// points at (see liveSession above). The account-summary probe IS the real
+// source of truth (a live session returns leverage > 0). The handle never
+// changes, so the app's stored uuid and the robots keyed by it need no rewiring.
+const inFlight = new Map<string, Promise<{ reconnected: boolean }>>();
+
+async function summaryLeverage(id: string): Promise<number> {
+  try {
+    const summary = await getAccountSummary(id);
+    return Number(summary?.leverage) || 0;
+  } catch {
+    return 0;
+  }
+}
+
+async function reestablish(
+  id: string,
+  server: string,
+  user: string,
+  password: string,
+): Promise<{ reconnected: boolean }> {
+  if (await summaryLeverage(id)) return { reconnected: false };
+
+  // Re-auth under the session it already uses. Tolerate ConnectEx throwing
+  // (e.g. "already connected"); the summary re-check is the gate.
+  await connectEx(id, server, user, password).catch(() => {});
+  if (await summaryLeverage(id)) return { reconnected: true };
+
+  // That session is gone for good: open a new one and point the handle at it.
+  const dead = sessionFor(id);
+  const fresh = crypto.randomUUID();
+  await connectEx(fresh, server, user, password).catch(() => {});
+  if (!(await summaryLeverage(fresh))) {
+    await disconnect(fresh).catch(() => {});
+    throw new Error('Reconnect failed');
+  }
+  liveSession.set(id, fresh);
+  if (dead !== id) await disconnect(dead).catch(() => {});
+  return { reconnected: true };
+}
+
 export async function ensureConnected(
   id: string,
   server: string,
   user: string,
   password: string,
 ): Promise<{ reconnected: boolean }> {
-  try {
-    const summary = await getAccountSummary(id);
-    if (summary?.leverage) return { reconnected: false };
-  } catch {
-    /* probe failed -> treat as dead, re-establish below */
-  }
-  // Re-auth under the same id. Tolerate ConnectEx throwing (e.g. "already
-  // connected") — the summary re-check is the gate, not ConnectEx's response.
-  await connectEx(id, server, user, password).catch(() => {});
-  const summary = await getAccountSummary(id);
-  if (!summary?.leverage) throw new Error('Reconnect failed');
-  return { reconnected: true };
+  // One account can be checked by a robot and the app at once; they share one
+  // attempt so a dead session is replaced once, not once each.
+  const running = inFlight.get(id);
+  if (running) return running;
+  const attempt = reestablish(id, server, user, password).finally(() => inFlight.delete(id));
+  inFlight.set(id, attempt);
+  return attempt;
 }
 
 export interface AccountDetails {
@@ -302,7 +358,7 @@ export async function getPriceHistory(
 
 export async function getQuoteMany(id: string, symbols: string[]): Promise<Quote[]> {
   const url = new URL(`${API2TRADE_BASE}/GetQuoteMany`);
-  url.searchParams.set('id', id);
+  url.searchParams.set('id', sessionFor(id));
   for (const s of symbols) url.searchParams.append('symbols', s);
 
   const controller = new AbortController();
@@ -339,7 +395,7 @@ export interface MarketWatch {
 
 export async function getMarketWatch(id: string, symbols: string[]): Promise<MarketWatch[]> {
   const url = new URL(`${API2TRADE_BASE}/MarketWatchMany`);
-  url.searchParams.set('id', id);
+  url.searchParams.set('id', sessionFor(id));
   for (const s of symbols) url.searchParams.append('symbols', s);
 
   const controller = new AbortController();
