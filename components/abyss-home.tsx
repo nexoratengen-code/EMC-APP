@@ -150,9 +150,7 @@ export function AbyssHome(p: Props) {
         {/* One panel like TradePort's: News left, Trade in the centre, Scan right. */}
         <Animated.View style={[styles.panel, rise(actions)]}>
           <TouchableOpacity style={styles.side} onPress={p.onNews} activeOpacity={0.6} testID="action-fundamentals">
-            <View style={styles.sideIcon}>
-              <CalendarDays color={LUX.white} size={18} strokeWidth={1.6} />
-            </View>
+            <CalendarDays color={LUX.white} size={18} strokeWidth={1.6} />
             <Text style={styles.sideLabel}>NEWS</Text>
           </TouchableOpacity>
 
@@ -170,16 +168,16 @@ export function AbyssHome(p: Props) {
                   : <Play color="#000000" size={22} fill="#000000" style={{ marginLeft: 3 }} />}
               </View>
             </View>
-            <Text style={[styles.tradeLabel, p.botActive && { color: '#22C55E' }]}>{p.botActive ? 'STOP' : 'TRADE'}</Text>
           </TouchableOpacity>
 
-          <TouchableOpacity style={styles.side} onPress={p.onScan} activeOpacity={0.6} testID="action-scan">
-            <View style={styles.sideIcon}>
-              <TrendingUp color={LUX.white} size={18} strokeWidth={1.6} />
-            </View>
+          <TouchableOpacity style={[styles.side, styles.sideRight]} onPress={p.onScan} activeOpacity={0.6} testID="action-scan">
             <Text style={styles.sideLabel}>SCAN</Text>
+            <TrendingUp color={LUX.white} size={18} strokeWidth={1.6} />
           </TouchableOpacity>
         </Animated.View>
+        <Animated.Text style={[styles.tradeLabel, { opacity: actions }, p.botActive && { color: '#22C55E' }]}>
+          {p.botActive ? 'STOP' : 'TRADE'}
+        </Animated.Text>
 
         <Animated.View style={[styles.list, { opacity: list }]}>
           {p.otherEAs.length > 0 && (
@@ -247,25 +245,23 @@ const styles = StyleSheet.create({
   title: { color: LUX.white, fontSize: 44, lineHeight: 50, fontWeight: '200', letterSpacing: -1.5 },
   subtitle: { color: LUX.grey, fontSize: 15, fontWeight: '300', marginTop: 8 },
 
+  // The same long pill shape as the white button, holding all three.
   panel: {
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-around',
-    paddingVertical: 20, paddingHorizontal: 10, borderRadius: 28,
-    backgroundColor: '#0A0A0B', borderWidth: 1, borderColor: LUX.hairline,
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+    height: 92, borderRadius: 46, paddingHorizontal: 7,
+    backgroundColor: '#0A0A0B', borderWidth: 1, borderColor: 'rgba(255,255,255,0.16)',
   },
-  side: { alignItems: 'center', width: 80, gap: 10 },
-  sideIcon: {
-    width: 46, height: 46, borderRadius: 23, alignItems: 'center', justifyContent: 'center',
-    borderWidth: 1, borderColor: 'rgba(255,255,255,0.18)',
-  },
-  sideLabel: { color: LUX.grey, fontSize: 11, fontWeight: '500', letterSpacing: 2.4 },
-  centre: { alignItems: 'center', gap: 10 },
+  side: { flex: 1, height: '100%', flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10 },
+  sideRight: {},
+  sideLabel: { color: LUX.silver, fontSize: 12, fontWeight: '500', letterSpacing: 2.4 },
+  centre: { alignItems: 'center', justifyContent: 'center' },
   tradeRing: {
     width: 78, height: 78, borderRadius: 39, alignItems: 'center', justifyContent: 'center',
     borderWidth: 1, borderColor: 'rgba(255,255,255,0.3)',
   },
   tradeCore: { width: 62, height: 62, borderRadius: 31, backgroundColor: LUX.white, alignItems: 'center', justifyContent: 'center' },
   tradeCoreActive: { backgroundColor: 'transparent', borderWidth: 1, borderColor: 'rgba(34,197,94,0.6)' },
-  tradeLabel: { color: LUX.white, fontSize: 11, fontWeight: '600', letterSpacing: 2.4 },
+  tradeLabel: { color: LUX.white, fontSize: 11, fontWeight: '600', letterSpacing: 2.4, textAlign: 'center', marginTop: 12 },
 
   list: { marginTop: 40, borderTopWidth: 1, borderTopColor: LUX.hairline },
   listLabel: { color: LUX.grey, fontSize: 11, fontWeight: '500', letterSpacing: 2.4, marginTop: 18, marginBottom: 4 },
