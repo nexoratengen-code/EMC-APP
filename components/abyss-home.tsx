@@ -4,7 +4,7 @@ import {
   AccessibilityInfo, Modal,
 } from 'react-native';
 import { Menu, ChevronRight } from 'lucide-react-native';
-import { LUX, LuxPill, LuxRule, rise, useEntrance } from '@/components/abyss-lux';
+import { LUX, LuxPill, LuxRule, rise, useEntrance, FocusFade } from '@/components/abyss-lux';
 
 /**
  * Home in the Abyss style, minimal luxury (28 Oct 2026). The same things as
@@ -101,6 +101,7 @@ export function AbyssHome(p: Props) {
   }, [p.running, halo]);
 
   return (
+    <FocusFade>
     <SafeAreaView
       style={[
         styles.container,
@@ -198,6 +199,7 @@ export function AbyssHome(p: Props) {
         testID="setup-dialog"
       />
     </SafeAreaView>
+    </FocusFade>
   );
 }
 

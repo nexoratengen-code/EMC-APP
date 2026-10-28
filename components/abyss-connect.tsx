@@ -4,7 +4,7 @@ import {
   Platform, ActivityIndicator, KeyboardAvoidingView, Animated,
 } from 'react-native';
 import { Eye, EyeOff, Menu } from 'lucide-react-native';
-import { LUX, LuxPill, LuxRule, rise, useEntrance } from '@/components/abyss-lux';
+import { LUX, LuxPill, LuxRule, rise, useEntrance, FocusFade } from '@/components/abyss-lux';
 
 /**
  * The MT5 connect screen in the Abyss style, minimal luxury to match the start
@@ -53,6 +53,7 @@ export function AbyssConnect(p: Props) {
   const underline = (name: 'login' | 'password') => [styles.underline, focus === name && { backgroundColor: LUX.white }];
 
   return (
+    <FocusFade>
     <SafeAreaView
       style={[
         styles.container,
@@ -154,6 +155,7 @@ export function AbyssConnect(p: Props) {
         </ScrollView>
       </KeyboardAvoidingView>
     </SafeAreaView>
+    </FocusFade>
   );
 }
 

@@ -3,6 +3,7 @@ import {
   View, Text, StyleSheet, TouchableOpacity, Platform, Animated, Easing, AccessibilityInfo, ActivityIndicator,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
+import { useIsFocused } from '@react-navigation/native';
 
 /**
  * Minimal luxury pieces for EMC's Abyss style (dev's pick, 28 Oct 2026, after
@@ -45,6 +46,33 @@ export function useEntrance(count: number, { delay = 120, duration = 700, first 
     return () => { cancelled = true; };
   }, [values, delay, duration, first]);
   return values;
+}
+
+/**
+ * Screen transition for the tab screens (Home, MetaTrader, Settings), which
+ * stay mounted: each time the screen comes into focus it fades in and rises a
+ * few pixels, so moving between pages never reads as a hard cut. Instant when
+ * reduced motion is on.
+ */
+export function FocusFade({ children }: { children: React.ReactNode }) {
+  const focused = useIsFocused();
+  const v = useRef(new Animated.Value(0)).current;
+  useEffect(() => {
+    if (!focused) return;
+    let cancelled = false;
+    AccessibilityInfo.isReduceMotionEnabled().catch(() => false).then((reduce) => {
+      if (cancelled) return;
+      if (reduce) { v.setValue(1); return; }
+      v.setValue(0);
+      Animated.timing(v, { toValue: 1, duration: 320, easing: Easing.out(Easing.cubic), useNativeDriver: native }).start();
+    });
+    return () => { cancelled = true; };
+  }, [focused, v]);
+  return (
+    <Animated.View style={{ flex: 1, backgroundColor: LUX.black, opacity: v, transform: [{ translateY: v.interpolate({ inputRange: [0, 1], outputRange: [10, 0] }) }] }}>
+      {children}
+    </Animated.View>
+  );
 }
 
 /** The small silver mark: a hairline ring with a point of light, and EMC. */

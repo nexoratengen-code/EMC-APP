@@ -93,7 +93,8 @@ export interface ThemeState {
 
 export const [ThemeProvider, useTheme] = createContextHook<ThemeState>(() => {
   const [themeName, setThemeNameState] = useState<ThemeName>('violet');
-  const [glassMode, setGlassModeState] = useState<GlassMode>('commander');
+  // New members get the Abyss look (28 Oct 2026); a style someone picked is kept.
+  const [glassMode, setGlassModeState] = useState<GlassMode>('abyss');
   const [fontFamily, setFontFamilyState] = useState<FontFamily>('system');
   const [heroStyle, setHeroStyleState] = useState<HeroStyle>('circle');
   const [textCase, setTextCaseState] = useState<TextCase>('normal');
