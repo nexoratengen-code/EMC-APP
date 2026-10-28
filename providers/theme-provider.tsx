@@ -133,7 +133,8 @@ export const [ThemeProvider, useTheme] = createContextHook<ThemeState>(() => {
   const setGlowColor = useCallback((c: string) => { setGlowColorState(c); AsyncStorage.setItem(GLOW_STORAGE_KEY, JSON.stringify(c)).catch(() => {}); }, []);
 
   const theme = buildEffectiveTheme(THEMES[themeName], glowColor);
-  const fontFamilyCSS = FONT_MAP[fontFamily];
+  // Abyss is designed around Sora, so it brings its own font with it.
+  const fontFamilyCSS = glassMode === 'abyss' ? FONT_MAP.sora : FONT_MAP[fontFamily];
   const textCaseCSS = TEXT_CASE_MAP[textCase];
 
   return { themeName, theme, setThemeName, glassMode, setGlassMode, fontFamily, fontFamilyCSS, setFontFamily, heroStyle, setHeroStyle, textCase, textCaseCSS, setTextCase, bgType, setBgType, cardBgMode, setCardBgMode, cardShape, setCardShape, glowColor, setGlowColor };
