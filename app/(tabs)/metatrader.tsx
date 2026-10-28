@@ -12,6 +12,7 @@ import { apiService } from '../../services/api';
 import { useTheme } from '@/providers/theme-provider';
 import { PageBackground } from '@/components/page-background';
 import { useSidebar } from '@/providers/sidebar-provider';
+import { AbyssConnect } from '@/components/abyss-connect';
 
 // Default MT4 Brokers (will be updated from web terminal)
 const DEFAULT_MT4_BROKERS = [
@@ -1922,7 +1923,26 @@ export default function MetaTraderScreen() {
     }
   };
 
-
+  // The Abyss style draws its own MT5 screen; the connect flow above is shared.
+  if (glassMode === 'abyss' && activeTab === 'MT5') {
+    return (
+      <AbyssConnect
+        connected={Boolean(mt5Account?.uuid && mt5Account.connected)}
+        noBalance={noBalance}
+        isAuthenticating={isAuthenticating}
+        authenticationStep={authenticationStep}
+        login={login}
+        setLogin={setLogin}
+        password={password}
+        setPassword={setPassword}
+        showPassword={showPassword}
+        setShowPassword={setShowPassword}
+        server={server || MT5_BROKERS[0]}
+        onSubmit={handleLinkAccount}
+        onMenu={toggleSidebar}
+      />
+    );
+  }
 
   return (
     <SafeAreaView style={[styles.container, Platform.OS === 'web' && { backgroundImage: isNeon ? 'linear-gradient(135deg, rgba(' + a + ', 0.7) 0%, rgba(' + a + ', 0.3) 25%, rgba(0,0,0,0.85) 55%, #000 100%)' : isLiquid ? 'linear-gradient(160deg, #1a1a1e 0%, #111113 40%, #0a0a0c 100%)' : 'none' }]}>

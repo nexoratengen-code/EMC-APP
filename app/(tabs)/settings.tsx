@@ -80,10 +80,10 @@ export default function SettingsScreen() {
         <Text style={[styles.sectionLabel, { marginTop: 32 }]}>GLASS STYLE</Text>
         <View style={[styles.glassCard, { borderColor: 'rgba(' + theme.accentRgb + ', 0.2)' }]}>
           <Text style={[styles.cardSubtitle, { marginBottom: 14 }]}>
-            {glassMode === 'neon' ? 'Neon glow with spinning borders' : glassMode === 'minimal' ? 'Dark glass with accent aura' : glassMode === 'liquid' ? 'Frosted translucent iOS glass' : glassMode === 'mech' ? 'Robot background with voice circle' : 'Commander with robot background'}
+            {glassMode === 'neon' ? 'Neon glow with spinning borders' : glassMode === 'minimal' ? 'Dark glass with accent aura' : glassMode === 'liquid' ? 'Frosted translucent iOS glass' : glassMode === 'mech' ? 'Robot background with voice circle' : glassMode === 'abyss' ? 'Deep navy with blue glass' : 'Commander with robot background'}
           </Text>
           <View style={styles.glassSegmented}>
-            {(['neon', 'minimal', 'liquid', 'commander', 'mech'] as const).map((m) => {
+            {(['neon', 'minimal', 'liquid', 'commander', 'mech', 'abyss'] as const).map((m) => {
               const active = glassMode === m;
               return (
                 <AnimatedButton
@@ -94,7 +94,7 @@ export default function SettingsScreen() {
                   style={styles.glassSeg}
                   onPress={() => setGlassMode(m)}
                 >
-                  <Text style={[styles.glassSegText, active && { color: theme.accent }]}>{m === 'neon' ? 'Neon' : m === 'minimal' ? 'Minimal' : m === 'liquid' ? 'Liquid' : m === 'mech' ? 'Mech' : 'Commander'}</Text>
+                  <Text style={[styles.glassSegText, active && { color: theme.accent }]}>{m === 'neon' ? 'Neon' : m === 'minimal' ? 'Minimal' : m === 'liquid' ? 'Liquid' : m === 'mech' ? 'Mech' : m === 'abyss' ? 'Abyss' : 'Commander'}</Text>
                 </AnimatedButton>
               );
             })}
