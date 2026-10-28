@@ -1,23 +1,24 @@
 import React, { useEffect, useRef, useState } from 'react';
 import {
-  View, Text, StyleSheet, TextInput, TouchableOpacity, SafeAreaView, ActivityIndicator, Image, Linking,
+  View, Text, StyleSheet, TextInput, TouchableOpacity, SafeAreaView, Image, Linking,
   Platform, KeyboardAvoidingView, ScrollView, Animated, Easing, AccessibilityInfo,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { ABYSS } from '@/components/abyss-connect';
+import { AbyssPill } from '@/components/abyss-pill';
+import { ABYSS_BLACK, rise } from '@/components/abyss-splash';
 
 /**
- * Sign in, in the Abyss style. Presentation only: the login screen keeps the
- * whole check (mentor + email, paywall, used-email lock) and passes values
- * and handlers in. Same words as the old screen.
+ * Sign in, in the Abyss style, matching the start page (Shakuro layout): black
+ * page, the robot at the top, the heading big and light, dark rounded fields
+ * with no box around them, and the same animated pill button.
+ *
+ * Presentation only: app/login.tsx keeps the whole check (mentor + email,
+ * paywall, used-email lock) and passes values and handlers in. Same words as
+ * the old screen.
  */
 const web = Platform.OS === 'web';
 const native = !web;
-
-const rise = (v: Animated.Value) => ({
-  opacity: v,
-  transform: [{ translateY: v.interpolate({ inputRange: [0, 1], outputRange: [16, 0] }) }],
-});
 
 type Props = {
   mentorId: string;
@@ -34,24 +35,33 @@ type Props = {
 
 export function AbyssLogin(p: Props) {
   const [focus, setFocus] = useState<'mentor' | 'email' | null>(null);
-  const hero = useRef(new Animated.Value(0)).current;
-  const card = useRef(new Animated.Value(0)).current;
+  const art = useRef(new Animated.Value(0)).current;
+  const head = useRef(new Animated.Value(0)).current;
+  const form = useRef(new Animated.Value(0)).current;
   const foot = useRef(new Animated.Value(0)).current;
+  const float = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
+    let loop: Animated.CompositeAnimation | null = null;
     let cancelled = false;
     AccessibilityInfo.isReduceMotionEnabled().catch(() => false).then((reduce) => {
       if (cancelled) return;
-      if (reduce) { [hero, card, foot].forEach((v) => v.setValue(1)); return; }
+      if (reduce) { [art, head, form, foot].forEach((v) => v.setValue(1)); return; }
       const ease = Easing.out(Easing.cubic);
-      Animated.stagger(140, [hero, card, foot].map((v) =>
-        Animated.timing(v, { toValue: 1, duration: 650, easing: ease, useNativeDriver: native }),
-      )).start();
+      Animated.sequence([
+        Animated.timing(art, { toValue: 1, duration: 700, easing: ease, useNativeDriver: native }),
+        Animated.stagger(130, [head, form, foot].map((v) =>
+          Animated.timing(v, { toValue: 1, duration: 600, easing: ease, useNativeDriver: native }),
+        )),
+      ]).start();
+      loop = Animated.loop(Animated.sequence([
+        Animated.timing(float, { toValue: 1, duration: 4000, easing: Easing.inOut(Easing.sin), useNativeDriver: native }),
+        Animated.timing(float, { toValue: 0, duration: 4000, easing: Easing.inOut(Easing.sin), useNativeDriver: native }),
+      ]));
+      loop.start();
     });
-    return () => { cancelled = true; };
-  }, [hero, card, foot]);
-
-  const busy = p.isLoading || p.isPaymentProcessing;
+    return () => { cancelled = true; loop?.stop(); };
+  }, [art, head, form, foot, float]);
 
   const field = (name: 'mentor' | 'email') => [
     styles.field,
@@ -60,46 +70,40 @@ export function AbyssLogin(p: Props) {
   ];
 
   return (
-    <SafeAreaView
-      style={[
-        styles.container,
-        web && ({
-          backgroundImage: `radial-gradient(ellipse 90% 45% at 50% 0%, rgba(${ABYSS.blueRgb}, 0.30) 0%, rgba(${ABYSS.blueRgb}, 0.08) 45%, transparent 75%)`,
-        } as any),
-      ]}
-    >
+    <SafeAreaView style={styles.container}>
       <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
         <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
-          <Animated.View style={rise(hero)}>
+          <Animated.View
+            style={[
+              styles.artWrap,
+              {
+                opacity: art,
+                transform: [{ translateY: float.interpolate({ inputRange: [0, 1], outputRange: [0, -6] }) }],
+              },
+            ]}
+          >
+            <Image source={require('@/assets/images/emc-robot-hero.jpg')} style={styles.art} resizeMode="contain" />
             <LinearGradient
-              colors={['#5B86FF', '#2A4FCC', '#141D45']}
-              locations={[0, 0.5, 1]}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 0.6, y: 1 }}
-              style={styles.hero}
-            >
-              <LinearGradient
-                colors={['rgba(255,255,255,0.16)', 'rgba(255,255,255,0)']}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 0, y: 1 }}
-                style={styles.sheen}
-                pointerEvents="none"
-              />
-              <Image source={require('@/assets/images/icon.png')} style={styles.mark} resizeMode="contain" />
-              <Text style={styles.appName}>EA Mobile Connect</Text>
-              <Text style={styles.tagline}>Algorithmic Trading Platform</Text>
-            </LinearGradient>
+              colors={['rgba(0,0,0,0)', ABYSS_BLACK]}
+              locations={[0.7, 1]}
+              style={StyleSheet.absoluteFill}
+              pointerEvents="none"
+            />
           </Animated.View>
 
-          <Animated.View style={[styles.card, rise(card)]}>
-            <Text style={styles.welcome}>Welcome Back</Text>
+          <Animated.View style={[styles.head, rise(head)]}>
+            <Text style={styles.kicker}>EA MOBILE CONNECT</Text>
+            <Text style={styles.title}>Welcome Back</Text>
+            <Text style={styles.tagline}>Algorithmic Trading Platform</Text>
+          </Animated.View>
 
+          <Animated.View style={rise(form)}>
             <Text style={styles.label}>Mentor ID</Text>
             <View style={field('mentor')}>
               <TextInput
                 style={styles.input}
                 placeholder="Enter your mentor ID"
-                placeholderTextColor={ABYSS.faint}
+                placeholderTextColor="rgba(255,255,255,0.3)"
                 value={p.mentorId}
                 onChangeText={p.setMentorId}
                 autoCapitalize="none"
@@ -114,7 +118,7 @@ export function AbyssLogin(p: Props) {
               <TextInput
                 style={styles.input}
                 placeholder="Enter your email"
-                placeholderTextColor={ABYSS.faint}
+                placeholderTextColor="rgba(255,255,255,0.3)"
                 value={p.email}
                 onChangeText={p.setEmail}
                 keyboardType="email-address"
@@ -127,29 +131,18 @@ export function AbyssLogin(p: Props) {
               />
             </View>
 
-            <TouchableOpacity
-              onPress={p.onProceed}
-              disabled={busy}
-              activeOpacity={0.85}
-              style={[
-                styles.button,
-                busy && { opacity: 0.6 },
-                web && ({ boxShadow: `0 10px 30px rgba(${ABYSS.blueRgb}, 0.35)` } as any),
-              ]}
-              testID="abyss-continue"
-            >
-              {busy ? (
-                <View style={styles.row}>
-                  <ActivityIndicator color="#FFFFFF" size="small" />
-                  <Text style={styles.buttonText}>{p.isLoading ? 'Verifying...' : 'Processing...'}</Text>
-                </View>
-              ) : (
-                <Text style={styles.buttonText}>Continue</Text>
-              )}
-            </TouchableOpacity>
+            <View style={styles.buttonGap}>
+              <AbyssPill
+                label="Continue"
+                onPress={p.onProceed}
+                busy={p.isLoading || p.isPaymentProcessing}
+                busyLabel={p.isLoading ? 'Verifying...' : 'Processing...'}
+                testID="abyss-continue"
+              />
+            </View>
           </Animated.View>
 
-          <Animated.View style={rise(foot)}>
+          <Animated.View style={[styles.foot, rise(foot)]}>
             <View style={styles.legalRow}>
               <TouchableOpacity onPress={() => Linking.openURL('https://eamobileconnect.com/admin/info/about/terms.php').catch(() => {})}>
                 <Text style={styles.legalLink}>Terms & Conditions</Text>
@@ -173,12 +166,12 @@ export function AbyssLogin(p: Props) {
             <Text style={styles.modalTitle}>{p.modal.title}</Text>
             <Text style={styles.modalMessage}>{p.modal.message}</Text>
             <TouchableOpacity style={styles.quietButton} onPress={p.onDismissModal} activeOpacity={0.8}>
-              <Text style={styles.buttonText}>Dismiss</Text>
+              <Text style={styles.quietText}>Dismiss</Text>
             </TouchableOpacity>
             {p.modal.title === 'Email Already Used' && (
-              <TouchableOpacity style={[styles.button, { marginTop: 10 }]} onPress={p.onReactivate} activeOpacity={0.85}>
-                <Text style={styles.buttonText}>Reactivate Account</Text>
-              </TouchableOpacity>
+              <View style={{ marginTop: 10 }}>
+                <AbyssPill label="Reactivate Account" onPress={p.onReactivate} />
+              </View>
             )}
           </View>
         </View>
@@ -188,60 +181,42 @@ export function AbyssLogin(p: Props) {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: ABYSS.ground },
+  container: { flex: 1, backgroundColor: ABYSS_BLACK },
   flex: { flex: 1 },
   content: {
-    flexGrow: 1, justifyContent: 'center', paddingHorizontal: 20, paddingVertical: 28,
+    flexGrow: 1, paddingHorizontal: 24, paddingBottom: 26,
     width: '100%', maxWidth: 480, alignSelf: 'center',
   },
 
-  hero: {
-    borderRadius: 28, paddingVertical: 28, paddingHorizontal: 24, marginBottom: 18, overflow: 'hidden',
-    borderWidth: 1, borderColor: 'rgba(255,255,255,0.14)', alignItems: 'center',
-  },
-  sheen: { position: 'absolute', top: 0, left: 0, right: 0, height: '70%' },
-  mark: {
-    width: 64, height: 64, borderRadius: 18, marginBottom: 16,
-    borderWidth: 1, borderColor: 'rgba(255,255,255,0.28)',
-  },
-  appName: { color: '#FFFFFF', fontSize: 26, fontWeight: '600', letterSpacing: -0.5 },
-  tagline: { color: 'rgba(255,255,255,0.72)', fontSize: 13, marginTop: 6 },
+  artWrap: { height: 230, marginHorizontal: -24, justifyContent: 'center', overflow: 'hidden' },
+  art: { width: '100%', height: '100%', transform: [{ scale: 1.25 }] },
 
-  card: {
-    backgroundColor: ABYSS.surface, borderRadius: 24, borderWidth: 1, borderColor: ABYSS.edge,
-    padding: 20, marginBottom: 20,
-  },
-  welcome: { color: ABYSS.text, fontSize: 22, fontWeight: '600', marginBottom: 14 },
-  label: { color: ABYSS.dim, fontSize: 12, fontWeight: '600', marginBottom: 8, marginTop: 4 },
+  head: { marginBottom: 26 },
+  kicker: { color: 'rgba(255,255,255,0.45)', fontSize: 12, fontWeight: '600', letterSpacing: 2, marginBottom: 8 },
+  title: { color: '#FFFFFF', fontSize: 38, lineHeight: 42, fontWeight: '300', letterSpacing: -1.2 },
+  tagline: { color: 'rgba(255,255,255,0.55)', fontSize: 15, marginTop: 8 },
+
+  label: { color: 'rgba(255,255,255,0.55)', fontSize: 13, fontWeight: '500', marginBottom: 8 },
   field: {
-    flexDirection: 'row', alignItems: 'center', height: 52, borderRadius: 16, paddingHorizontal: 16,
-    backgroundColor: 'rgba(255,255,255,0.03)', borderWidth: 1, borderColor: ABYSS.edge, marginBottom: 12,
+    flexDirection: 'row', alignItems: 'center', height: 56, borderRadius: 18, paddingHorizontal: 18,
+    backgroundColor: '#0E1118', borderWidth: 1, borderColor: 'rgba(255,255,255,0.10)', marginBottom: 16,
   },
-  input: { flex: 1, color: ABYSS.text, fontSize: 16, ...(web ? ({ outlineStyle: 'none' } as any) : null) },
+  input: { flex: 1, color: '#FFFFFF', fontSize: 16, ...(web ? ({ outlineStyle: 'none' } as any) : null) },
+  buttonGap: { marginTop: 10 },
 
-  button: {
-    height: 56, borderRadius: 18, backgroundColor: ABYSS.blue, marginTop: 6,
-    alignItems: 'center', justifyContent: 'center',
-  },
-  quietButton: {
-    height: 52, borderRadius: 16, borderWidth: 1, borderColor: 'rgba(255,255,255,0.18)',
-    alignItems: 'center', justifyContent: 'center',
-  },
-  row: { flexDirection: 'row', alignItems: 'center', gap: 10 },
-  buttonText: { color: '#FFFFFF', fontSize: 15, fontWeight: '700', letterSpacing: 0.4 },
-
-  legalRow: { flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 8, marginBottom: 10 },
-  legalLink: { color: '#7FA2FF', fontSize: 12, fontWeight: '600' },
-  legalDot: { color: ABYSS.faint, fontSize: 12 },
-  footer: { color: ABYSS.faint, fontSize: 11, textAlign: 'center' },
+  foot: { marginTop: 'auto', paddingTop: 28 },
+  legalRow: { flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 8, marginBottom: 8 },
+  legalLink: { color: 'rgba(255,255,255,0.6)', fontSize: 12, fontWeight: '500' },
+  legalDot: { color: 'rgba(255,255,255,0.3)', fontSize: 12 },
+  footer: { color: 'rgba(255,255,255,0.3)', fontSize: 11, textAlign: 'center' },
 
   overlay: {
     position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, padding: 24,
-    backgroundColor: 'rgba(5,8,16,0.72)', alignItems: 'center', justifyContent: 'center',
+    backgroundColor: 'rgba(0,0,0,0.72)', alignItems: 'center', justifyContent: 'center',
   },
   modal: {
-    width: '100%', maxWidth: 380, backgroundColor: ABYSS.surface, borderRadius: 24,
-    borderWidth: 1, borderColor: ABYSS.edge, padding: 22,
+    width: '100%', maxWidth: 380, backgroundColor: '#0E1118', borderRadius: 28,
+    borderWidth: 1, borderColor: 'rgba(255,255,255,0.10)', padding: 22,
   },
   modalIcon: {
     width: 44, height: 44, borderRadius: 22, alignSelf: 'center', marginBottom: 14,
@@ -249,6 +224,11 @@ const styles = StyleSheet.create({
     backgroundColor: `rgba(${ABYSS.blueRgb}, 0.15)`, borderWidth: 1, borderColor: `rgba(${ABYSS.blueRgb}, 0.35)`,
   },
   modalIconText: { color: '#7FA2FF', fontSize: 20, fontWeight: '800' },
-  modalTitle: { color: ABYSS.text, fontSize: 18, fontWeight: '600', textAlign: 'center', marginBottom: 8 },
-  modalMessage: { color: ABYSS.dim, fontSize: 14, lineHeight: 20, textAlign: 'center', marginBottom: 18 },
+  modalTitle: { color: '#FFFFFF', fontSize: 20, fontWeight: '400', textAlign: 'center', marginBottom: 8 },
+  modalMessage: { color: 'rgba(255,255,255,0.55)', fontSize: 14, lineHeight: 20, textAlign: 'center', marginBottom: 18 },
+  quietButton: {
+    height: 52, borderRadius: 26, borderWidth: 1, borderColor: 'rgba(255,255,255,0.16)',
+    alignItems: 'center', justifyContent: 'center',
+  },
+  quietText: { color: '#FFFFFF', fontSize: 15, fontWeight: '500' },
 });
