@@ -2,7 +2,7 @@ import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, SafeAreaView, ScrollView, Linking, Platform, Animated } from 'react-native';
 import { Menu, Check, ChevronRight } from 'lucide-react-native';
 import { LUX, LuxRule, rise, useEntrance, FocusFade, GLOW_COLOURS } from '@/components/abyss-lux';
-import type { GlassMode } from '@/providers/theme-provider';
+import { useTheme, type GlassMode, type PictureAlign } from '@/providers/theme-provider';
 
 /**
  * Settings in the Abyss style (28 Oct 2026). Abyss sets its own colours and
@@ -29,6 +29,7 @@ export function AbyssSettings({ glassMode, setGlassMode, glowColor, setGlowColor
   glowColor: string; setGlowColor: (c: string) => void; onMenu: () => void;
 }) {
   const [top, title, rule, body] = useEntrance(4, { delay: 110, duration: 750, first: 100 });
+  const { pictureAlign, setPictureAlign, pictureBackground, setPictureBackground } = useTheme();
 
   return (
     <FocusFade>
@@ -71,6 +72,45 @@ export function AbyssSettings({ glassMode, setGlassMode, glowColor, setGlowColor
               );
             })}
           </View>
+
+          {/* Where the home puts the EA picture at the top. */}
+          <Text style={[styles.label, { marginTop: 36 }]}>PICTURE</Text>
+          <View style={styles.segment}>
+            {(['left', 'center', 'right'] as PictureAlign[]).map((a) => {
+              const on = a === pictureAlign;
+              return (
+                <TouchableOpacity
+                  key={a}
+                  onPress={() => setPictureAlign(a)}
+                  activeOpacity={0.75}
+                  style={[styles.segmentItem, on && styles.segmentOn]}
+                  testID={`picture-${a}`}
+                >
+                  <Text style={[styles.segmentText, on && styles.segmentTextOn]}>
+                    {a === 'left' ? 'Left' : a === 'center' ? 'Centre' : 'Right'}
+                  </Text>
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+
+          {/* Small toggle: the picture as a soft background behind the home. */}
+          <TouchableOpacity
+            style={styles.toggleRow}
+            onPress={() => setPictureBackground(!pictureBackground)}
+            activeOpacity={0.75}
+            testID="picture-background"
+            accessibilityRole="switch"
+            accessibilityState={{ checked: pictureBackground }}
+          >
+            <View style={{ flex: 1 }}>
+              <Text style={styles.rowTitle}>Picture as background</Text>
+              <Text style={styles.rowSub}>Fills the top of the home, softly</Text>
+            </View>
+            <View style={[styles.track, pictureBackground && styles.trackOn]}>
+              <View style={[styles.thumb, pictureBackground && styles.thumbOn]} />
+            </View>
+          </TouchableOpacity>
 
           <Text style={[styles.label, { marginTop: 40 }]}>STYLE</Text>
           <View style={styles.list}>
@@ -116,6 +156,22 @@ const styles = StyleSheet.create({
   label: { color: LUX.grey, fontSize: 11, fontWeight: '500', letterSpacing: 2.4, marginBottom: 6 },
   list: { borderTopWidth: 1, borderTopColor: LUX.hairline },
   swatches: { flexDirection: 'row', flexWrap: 'wrap', gap: 12, paddingTop: 10 },
+  segment: {
+    flexDirection: 'row', padding: 4, marginTop: 6, borderRadius: 26,
+    borderWidth: 1, borderColor: 'rgba(255,255,255,0.16)', backgroundColor: '#0A0A0B',
+  },
+  segmentItem: { flex: 1, height: 42, borderRadius: 21, alignItems: 'center', justifyContent: 'center' },
+  segmentOn: { backgroundColor: LUX.white },
+  segmentText: { color: LUX.silver, fontSize: 14, fontWeight: '400' },
+  segmentTextOn: { color: '#000000', fontWeight: '500' },
+  toggleRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 16, marginTop: 10, borderBottomWidth: 1, borderBottomColor: LUX.hairline },
+  track: {
+    width: 44, height: 26, borderRadius: 13, padding: 3, justifyContent: 'center',
+    backgroundColor: 'rgba(255,255,255,0.12)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.18)',
+  },
+  trackOn: { backgroundColor: LUX.white, borderColor: LUX.white },
+  thumb: { width: 18, height: 18, borderRadius: 9, backgroundColor: 'rgba(255,255,255,0.7)' },
+  thumbOn: { backgroundColor: '#000000', transform: [{ translateX: 18 }] },
   swatchRing: {
     width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center',
     borderWidth: 1.5, borderColor: 'transparent',

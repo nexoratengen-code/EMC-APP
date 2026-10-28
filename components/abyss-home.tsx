@@ -3,8 +3,10 @@ import {
   View, Text, StyleSheet, TouchableOpacity, SafeAreaView, ScrollView, Image, Platform, Animated, Easing,
   AccessibilityInfo, Modal,
 } from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
 import { Menu, ChevronRight, CalendarDays, TrendingUp, Play, Square, BarChart3, Plus, Trash2, Repeat } from 'lucide-react-native';
 import { LUX, LuxPill, LuxRule, rise, useEntrance, FocusFade, useGlowRgb } from '@/components/abyss-lux';
+import { useTheme } from '@/providers/theme-provider';
 
 /**
  * Home in the Abyss style, minimal luxury (28 Oct 2026). The same things as
@@ -102,6 +104,7 @@ export function AbyssHome(p: Props) {
   const [top, art, title, rule, actions, list] = useEntrance(6, { delay: 110, duration: 750, first: 100 });
   const halo = useRef(new Animated.Value(0)).current;
   const accent = useGlowRgb();
+  const { pictureAlign, pictureBackground } = useTheme();
 
   // The halo round the picture breathes slowly while the robot is running.
   useEffect(() => {
@@ -129,6 +132,18 @@ export function AbyssHome(p: Props) {
         } as any),
       ]}
     >
+      {/* Picture as background (Settings > Picture): the EA picture fills the top
+          of the page, softly, and melts into the black. Stays put while the page scrolls. */}
+      {pictureBackground && (
+        <Animated.View pointerEvents="none" style={[styles.bg, { opacity: art, transform: [{ translateX: pictureAlign === 'left' ? -70 : pictureAlign === 'right' ? 70 : 0 }] }]}>
+          {p.image ? (
+            <Image source={{ uri: p.image }} style={[styles.bgImg, { opacity: 0.5 }]} resizeMode="cover" />
+          ) : (
+            <Image source={require('@/assets/images/emc-robot-glow.png')} style={[styles.bgImg, { opacity: 0.75, transform: [{ scale: 1.15 }] }]} resizeMode="contain" />
+          )}
+          <LinearGradient colors={['rgba(0,0,0,0.15)', 'rgba(0,0,0,0.55)', '#000000']} locations={[0, 0.6, 1]} style={StyleSheet.absoluteFill} />
+        </Animated.View>
+      )}
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
         <Animated.View style={[styles.topBar, { opacity: top }]}>
           <TouchableOpacity onPress={p.onMenu} activeOpacity={0.6} hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }} testID="abyss-menu">
@@ -141,7 +156,7 @@ export function AbyssHome(p: Props) {
           </View>
         </Animated.View>
 
-        <Animated.View style={[styles.artRow, { opacity: art }]}>
+        {pictureBackground ? <View style={{ height: 150 }} /> : <Animated.View style={[styles.artRow, { opacity: art, alignItems: pictureAlign === 'center' ? 'center' : pictureAlign === 'right' ? 'flex-end' : 'flex-start' }]}>
           <View style={styles.portrait}>
             <Animated.View
               pointerEvents="none"
@@ -158,7 +173,7 @@ export function AbyssHome(p: Props) {
               )}
             </View>
           </View>
-        </Animated.View>
+        </Animated.View>}
 
         <Animated.Text testID="ea-title" style={[styles.title, rise(title, 22)]} numberOfLines={2}>{p.name}</Animated.Text>
         <Animated.Text style={[styles.subtitle, rise(title)]}>
@@ -273,6 +288,8 @@ const styles = StyleSheet.create({
   dot: { width: 6, height: 6, borderRadius: 3 },
   statusText: { color: LUX.grey, fontSize: 10, fontWeight: '500', letterSpacing: 2.4 },
 
+  bg: { position: 'absolute', top: 0, left: 0, right: 0, height: 460, overflow: 'hidden' },
+  bgImg: { width: '100%', height: '100%' },
   artRow: { marginTop: 36, marginBottom: 26 },
   portrait: { width: 104, height: 104, alignItems: 'center', justifyContent: 'center' },
   halo: { position: 'absolute', width: 104, height: 104, borderRadius: 52, backgroundColor: 'rgba(120,170,255,0.55)' },
