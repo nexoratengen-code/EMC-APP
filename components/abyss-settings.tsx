@@ -1,7 +1,7 @@
 import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, SafeAreaView, ScrollView, Linking, Platform, Animated } from 'react-native';
 import { Menu, Check, ChevronRight } from 'lucide-react-native';
-import { LUX, LuxRule, rise, useEntrance, FocusFade } from '@/components/abyss-lux';
+import { LUX, LuxRule, rise, useEntrance, FocusFade, GLOW_COLOURS } from '@/components/abyss-lux';
 import type { GlassMode } from '@/providers/theme-provider';
 
 /**
@@ -24,8 +24,9 @@ const LINKS = [
   { title: 'Privacy Policy', sub: 'How your information is handled', url: 'https://eamobileconnect.com/admin/info/about/privacy.php' },
 ];
 
-export function AbyssSettings({ glassMode, setGlassMode, onMenu }: {
-  glassMode: GlassMode; setGlassMode: (m: GlassMode) => void; onMenu: () => void;
+export function AbyssSettings({ glassMode, setGlassMode, glowColor, setGlowColor, onMenu }: {
+  glassMode: GlassMode; setGlassMode: (m: GlassMode) => void;
+  glowColor: string; setGlowColor: (c: string) => void; onMenu: () => void;
 }) {
   const [top, title, rule, body] = useEntrance(4, { delay: 110, duration: 750, first: 100 });
 
@@ -50,7 +51,28 @@ export function AbyssSettings({ glassMode, setGlassMode, onMenu }: {
         <LuxRule progress={rule} />
 
         <Animated.View style={rise(body)}>
-          <Text style={styles.label}>STYLE</Text>
+          {/* Glow: every glow in this style (cards, panel, menu, halo) follows it.
+              Green for running and red for remove keep their meaning. */}
+          <Text style={styles.label}>GLOW</Text>
+          <View style={styles.swatches}>
+            {GLOW_COLOURS.map((c) => {
+              const on = c.toLowerCase() === (glowColor || '').toLowerCase();
+              return (
+                <TouchableOpacity
+                  key={c}
+                  onPress={() => setGlowColor(c)}
+                  activeOpacity={0.75}
+                  accessibilityLabel={`Glow ${c}`}
+                  testID={`glow-${c.slice(1)}`}
+                  style={[styles.swatchRing, on && { borderColor: c }, on && Platform.OS === 'web' && ({ boxShadow: `0 0 14px ${c}99` } as any)]}
+                >
+                  <View style={[styles.swatch, { backgroundColor: c }]} />
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+
+          <Text style={[styles.label, { marginTop: 40 }]}>STYLE</Text>
           <View style={styles.list}>
             {STYLES.map((s) => {
               const on = s.mode === glassMode;
@@ -93,6 +115,12 @@ const styles = StyleSheet.create({
   title: { color: LUX.white, fontSize: 46, lineHeight: 52, fontWeight: '200', letterSpacing: -1.6, marginTop: 52 },
   label: { color: LUX.grey, fontSize: 11, fontWeight: '500', letterSpacing: 2.4, marginBottom: 6 },
   list: { borderTopWidth: 1, borderTopColor: LUX.hairline },
+  swatches: { flexDirection: 'row', flexWrap: 'wrap', gap: 12, paddingTop: 10 },
+  swatchRing: {
+    width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center',
+    borderWidth: 1.5, borderColor: 'transparent',
+  },
+  swatch: { width: 28, height: 28, borderRadius: 14, borderWidth: 1, borderColor: 'rgba(255,255,255,0.18)' },
   row: { flexDirection: 'row', alignItems: 'center', paddingVertical: 16, borderBottomWidth: 1, borderBottomColor: LUX.hairline },
   rowTitle: { color: LUX.white, fontSize: 17, fontWeight: '300' },
   rowSub: { color: LUX.grey, fontSize: 13, fontWeight: '300', marginTop: 3 },

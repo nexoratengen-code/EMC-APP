@@ -4,6 +4,7 @@ import {
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useIsFocused } from '@react-navigation/native';
+import { useTheme } from '@/providers/theme-provider';
 
 /**
  * Minimal luxury pieces for EMC's Abyss style (dev's pick, 28 Oct 2026, after
@@ -21,6 +22,24 @@ export const LUX = {
   faint: 'rgba(255,255,255,0.28)',
   hairline: 'rgba(255,255,255,0.18)',
 };
+
+/** Glow colours to choose from in Settings (the same set the side menu offered in the older styles). */
+export const GLOW_COLOURS = [
+  '#00BFFF', '#3B82F6', '#A855F7', '#00FF88', '#14B8A6', '#00FFCC', '#84CC16',
+  '#FFD700', '#FF6B00', '#FF3366', '#EC4899', '#FF00FF', '#EF4444', '#FFFFFF',
+];
+
+export function hexToRgb(hex: string): string {
+  const c = (hex || '').replace('#', '');
+  if (!/^[0-9a-fA-F]{6}$/.test(c)) return '0, 191, 255';
+  return `${parseInt(c.slice(0, 2), 16)}, ${parseInt(c.slice(2, 4), 16)}, ${parseInt(c.slice(4, 6), 16)}`;
+}
+
+/** The member's chosen glow (Settings > Glow) as "r, g, b"; every Abyss glow follows it. */
+export function useGlowRgb(): string {
+  const { glowColor } = useTheme();
+  return hexToRgb(glowColor);
+}
 
 /** Fade in and rise into place. */
 export const rise = (v: Animated.Value, by = 14) => ({

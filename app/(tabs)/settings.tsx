@@ -22,7 +22,7 @@ const THEME_OPTIONS: { name: ThemeName; label: string; preview: string }[] = [
 ];
 
 export default function SettingsScreen() {
-  const { themeName, theme, setThemeName, glassMode, setGlassMode, fontFamily, setFontFamily, heroStyle, setHeroStyle, textCase, setTextCase, bgType, setBgType, cardBgMode, setCardBgMode, cardShape, setCardShape } = useTheme();
+  const { themeName, theme, setThemeName, glassMode, setGlassMode, fontFamily, setFontFamily, heroStyle, setHeroStyle, textCase, setTextCase, bgType, setBgType, cardBgMode, setCardBgMode, cardShape, setCardShape, glowColor, setGlowColor } = useTheme();
   const { eas } = useApp();
   const { toggle: toggleSidebar } = useSidebar();
   const primaryEA = eas.length > 0 ? eas[0] : null;
@@ -38,7 +38,7 @@ export default function SettingsScreen() {
   const isCmd = glassMode === 'commander';
 
   if (glassMode === 'abyss') {
-    return <AbyssSettings glassMode={glassMode} setGlassMode={setGlassMode} onMenu={toggleSidebar} />;
+    return <AbyssSettings glassMode={glassMode} setGlassMode={setGlassMode} glowColor={glowColor} setGlowColor={setGlowColor} onMenu={toggleSidebar} />;
   }
 
   return (

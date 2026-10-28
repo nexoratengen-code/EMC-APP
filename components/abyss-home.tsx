@@ -4,7 +4,7 @@ import {
   AccessibilityInfo, Modal,
 } from 'react-native';
 import { Menu, ChevronRight, CalendarDays, TrendingUp, Play, Square, BarChart3, Plus, Trash2, Repeat } from 'lucide-react-native';
-import { LUX, LuxPill, LuxRule, rise, useEntrance, FocusFade } from '@/components/abyss-lux';
+import { LUX, LuxPill, LuxRule, rise, useEntrance, FocusFade, useGlowRgb } from '@/components/abyss-lux';
 
 /**
  * Home in the Abyss style, minimal luxury (28 Oct 2026). The same things as
@@ -18,8 +18,8 @@ import { LUX, LuxPill, LuxRule, rise, useEntrance, FocusFade } from '@/component
 const web = Platform.OS === 'web';
 const native = !web;
 
-// Soft glow round the trade panel and the cards, in EMC's blue (the robot's
-// own glow). Trial 28 Oct 2026: set to false to go back to plain edges.
+// Soft glow round the trade panel and the cards, in the member's chosen glow
+// colour (Settings > Glow; EMC cyan by default). Set GLOW to false for plain edges.
 const GLOW = true;
 const glow = (rgb: string, strength = 1) => (GLOW ? {
   borderColor: `rgba(${rgb}, ${0.42 * strength})`,
@@ -27,7 +27,6 @@ const glow = (rgb: string, strength = 1) => (GLOW ? {
     shadowColor: `rgb(${rgb})`, shadowOpacity: 0.35 * strength, shadowRadius: 16, shadowOffset: { width: 0, height: 0 }, elevation: 6,
   }),
 } : {});
-const EMC_BLUE = '80, 150, 255';
 const SOFT_RED = '248, 113, 113';
 
 type OtherEA = { id: string; name: string; image: string | null };
@@ -62,8 +61,9 @@ function Row({ title, sub, onPress, testID, danger, Icon }: {
   Icon: React.ComponentType<{ color?: string; size?: number; strokeWidth?: number }>;
 }) {
   const tint = danger ? '#F87171' : LUX.white;
+  const accent = useGlowRgb();
   return (
-    <TouchableOpacity style={[styles.card, danger && styles.cardDanger, glow(danger ? SOFT_RED : EMC_BLUE, danger ? 0.7 : 0.8)]} onPress={onPress} activeOpacity={0.7} testID={testID}>
+    <TouchableOpacity style={[styles.card, danger && styles.cardDanger, glow(danger ? SOFT_RED : accent, danger ? 0.7 : 0.8)]} onPress={onPress} activeOpacity={0.7} testID={testID}>
       <View style={[styles.cardIcon, danger && { borderColor: 'rgba(248,113,113,0.35)' }]}>
         <Icon color={tint} size={18} strokeWidth={1.6} />
       </View>
@@ -101,6 +101,7 @@ function LuxDialog({ visible, title, message, primary, onPrimary, secondary, onS
 export function AbyssHome(p: Props) {
   const [top, art, title, rule, actions, list] = useEntrance(6, { delay: 110, duration: 750, first: 100 });
   const halo = useRef(new Animated.Value(0)).current;
+  const accent = useGlowRgb();
 
   // The halo round the picture breathes slowly while the robot is running.
   useEffect(() => {
@@ -147,7 +148,7 @@ export function AbyssHome(p: Props) {
               style={[styles.halo, {
                 opacity: halo.interpolate({ inputRange: [0, 1], outputRange: [p.running ? 0.35 : 0.18, 0.7] }),
                 transform: [{ scale: halo.interpolate({ inputRange: [0, 1], outputRange: [1, 1.12] }) }],
-              }, web && ({ filter: 'blur(14px)' } as any), p.running && { backgroundColor: 'rgba(34,197,94,0.55)' }]}
+              }, web && ({ filter: 'blur(14px)' } as any), { backgroundColor: p.running ? 'rgba(34,197,94,0.55)' : `rgba(${accent}, 0.55)` }]}
             />
             <View style={styles.frame}>
               {p.image ? (
@@ -166,7 +167,7 @@ export function AbyssHome(p: Props) {
         <LuxRule progress={rule} />
 
         {/* One panel like TradePort's: News left, Trade in the centre, Scan right. */}
-        <Animated.View style={[styles.panel, glow(EMC_BLUE), rise(actions)]}>
+        <Animated.View style={[styles.panel, glow(accent), rise(actions)]}>
           <TouchableOpacity style={styles.side} onPress={p.onNews} activeOpacity={0.6} testID="action-fundamentals">
             <CalendarDays color={LUX.white} size={18} strokeWidth={1.6} />
             <Text style={styles.sideLabel}>NEWS</Text>
@@ -200,7 +201,7 @@ export function AbyssHome(p: Props) {
         <Animated.View style={[styles.list, { opacity: list }]}>
           {/* The EA card, as in the side menu (and where TradePort shows its EA):
               picture, name and live status; green glow while the robot runs. */}
-          <View testID="ea-info-card" style={[styles.eaCard, p.running ? glow('34, 197, 94', 0.8) : glow(EMC_BLUE, 0.55)]}>
+          <View testID="ea-info-card" style={[styles.eaCard, p.running ? glow('34, 197, 94', 0.8) : glow(accent, 0.55)]}>
             <View style={styles.eaAvatar}>
               {p.image ? (
                 <Image source={{ uri: p.image }} style={styles.portraitImg} resizeMode="cover" />

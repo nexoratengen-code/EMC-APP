@@ -1,13 +1,13 @@
 import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Platform, Image } from 'react-native';
 import { X, ChevronRight } from 'lucide-react-native';
-import { LUX, LuxMark } from '@/components/abyss-lux';
+import { LUX, LuxMark, useGlowRgb } from '@/components/abyss-lux';
 
 /**
  * The side menu in the Abyss style, matching the home (28 Oct 2026): the EA
  * as a card with its picture and live status, then every page as a dark,
- * fully rounded pill with a round icon. The page you are on glows in EMC's
- * blue (the robot's own glow). The sidebar's slide and overlay are reused;
+ * fully rounded pill with a round icon. The page you are on glows in the
+ * member's chosen glow colour (Settings > Glow; EMC cyan by default). The sidebar's slide and overlay are reused;
  * only what is inside changes.
  */
 type IconType = React.ComponentType<{ color?: string; size?: number; strokeWidth?: number }>;
@@ -24,7 +24,6 @@ type Props = {
 };
 
 const web = Platform.OS === 'web';
-const BLUE = '80, 150, 255';
 
 const glow = (rgb: string, strength = 1) => ({
   borderColor: `rgba(${rgb}, ${0.5 * strength})`,
@@ -34,8 +33,9 @@ const glow = (rgb: string, strength = 1) => ({
 });
 
 export function AbyssMenu({ items, activeKey, eaName, eaImage, running, onNav, onClose }: Props) {
+  const BLUE = useGlowRgb();
   return (
-    <View style={styles.panel}>
+    <View style={[styles.panel, web && ({ backgroundImage: `radial-gradient(ellipse 90% 35% at 0% 0%, rgba(${BLUE}, 0.10) 0%, transparent 70%)` } as any)]}>
       <View style={styles.header}>
         <LuxMark />
         <TouchableOpacity onPress={onClose} hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }} activeOpacity={0.6} style={styles.close}>
@@ -85,7 +85,7 @@ export function AbyssMenu({ items, activeKey, eaName, eaImage, running, onNav, o
                   {!!item.sub && <Text style={styles.sub}>{item.sub}</Text>}
                 </View>
                 {active
-                  ? <View style={[styles.activeDot, web && ({ boxShadow: `0 0 10px rgba(${BLUE}, 0.9)` } as any)]} />
+                  ? <View style={[styles.activeDot, { backgroundColor: `rgb(${BLUE})` }, web && ({ boxShadow: `0 0 10px rgba(${BLUE}, 0.9)` } as any)]} />
                   : <ChevronRight color={LUX.faint} size={16} strokeWidth={1.4} />}
               </TouchableOpacity>
             );
@@ -102,7 +102,6 @@ const styles = StyleSheet.create({
   panel: {
     ...StyleSheet.absoluteFillObject, backgroundColor: LUX.black,
     borderRightWidth: 1, borderRightColor: 'rgba(255,255,255,0.10)', paddingTop: 22,
-    ...(web ? ({ backgroundImage: `radial-gradient(ellipse 90% 35% at 0% 0%, rgba(${BLUE}, 0.10) 0%, transparent 70%)` } as any) : null),
   },
   header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 20 },
   close: {
@@ -140,7 +139,7 @@ const styles = StyleSheet.create({
   label: { color: 'rgba(255,255,255,0.72)', fontSize: 16, fontWeight: '300' },
   labelActive: { color: LUX.white, fontWeight: '400' },
   sub: { color: LUX.faint, fontSize: 11, fontWeight: '300', marginTop: 2 },
-  activeDot: { width: 7, height: 7, borderRadius: 4, backgroundColor: `rgb(${BLUE})` },
+  activeDot: { width: 7, height: 7, borderRadius: 4 },
 
   footer: { color: LUX.faint, fontSize: 11, paddingHorizontal: 22, paddingBottom: 22, letterSpacing: 0.4 },
 });
