@@ -4,7 +4,8 @@ import { router } from 'expo-router';
 // Networking disabled: avoid external browser/payment flows
 import { useApp } from '@/providers/app-provider';
 import { useTheme } from '@/providers/theme-provider';
-import { apiService } from '@/services/api';
+import { apiService, SIGNED_OUT_REASON_KEY } from '@/services/api';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Paywall } from '@/components/paywall';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
@@ -61,6 +62,23 @@ export default function LoginScreen() {
     }
   }, [user, eas.length]);
 
+  // Signed out by the server on the last open (see app-provider): say why once,
+  // so nobody thinks the app simply lost them.
+  useEffect(() => {
+    AsyncStorage.getItem(SIGNED_OUT_REASON_KEY).then((reason) => {
+      if (!reason) return;
+      AsyncStorage.removeItem(SIGNED_OUT_REASON_KEY).catch(() => {});
+      if (reason === 'signed_in_elsewhere') {
+        setModalTitle('Signed in on another device');
+        setModalMessage('Your account was signed in on another device, so this one was signed out. Sign in again to use it here.');
+      } else {
+        setModalTitle('Your access has ended');
+        setModalMessage('We could not find an active subscription for this account. Tap Reactivate your account to continue.');
+      }
+      setModalVisible(true);
+    }).catch(() => {});
+  }, []);
+
   const handleProceed = async () => {
     // Modal, not Alert.alert (a no-op on the web app, so these said nothing).
     if (!mentorId.trim() || !email.trim()) {
@@ -108,12 +126,9 @@ export default function LoginScreen() {
         return;
       }
 
+      // No more locking the email to this browser: the server gave this
+      // sign-in a session and any older device is signed out on its next open.
       setUser({ mentorId: trimmedMentor, email: account.email });
-      // Lock the email server-side so it can't be reused on another device.
-      // Fire-and-forget: even if the network drops here the user is already
-      // authenticated locally; the next attempt from any browser will be blocked
-      // because the backend will see used=true.
-      apiService.lockEmail(account.email).catch(() => {});
       router.replace('/license');
     } catch (error) {
       console.error('Login error:', error);
@@ -234,6 +249,29 @@ export default function LoginScreen() {
                 ) : (
                   <Text style={styles.proceedButtonText}>Continue</Text>
                 )}
+              </TouchableOpacity>
+            </View>
+
+            {/* Reactivation right under the form, as on TradePort: before this it
+                was only reachable from inside the "Email Already Used" error. */}
+            <View style={styles.reactivateRow}>
+              <Text style={styles.reactivateText}>Access expired?</Text>
+              <TouchableOpacity
+                onPress={() => {
+                  if (!email.normalize('NFKC').includes('@')) {
+                    setModalTitle('Enter your email');
+                    setModalMessage('Type the email you paid with above, then tap Reactivate your account.');
+                    setModalVisible(true);
+                    return;
+                  }
+                  setPaywallNotice('');
+                  setPaymentVisible(true);
+                }}
+                activeOpacity={0.7}
+                hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                testID="reactivate-link"
+              >
+                <Text style={[styles.reactivateLink, { color: ac }]}>Reactivate your account</Text>
               </TouchableOpacity>
             </View>
 
@@ -439,6 +477,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
+  reactivateRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, marginTop: 20 },
+  reactivateText: { fontSize: 13, color: 'rgba(255, 255, 255, 0.6)' },
+  reactivateLink: { fontSize: 13, fontWeight: '700' },
   legalRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10, marginTop: 24 },
   legalLink: { fontSize: 12, textDecorationLine: 'underline' },
   legalDot: { fontSize: 12, color: 'rgba(255, 255, 255, 0.3)' },

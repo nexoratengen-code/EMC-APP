@@ -1,4 +1,52 @@
+import AsyncStorage from '@react-native-async-storage/async-storage';
+
 const BASE_URL = (process.env.EXPO_PUBLIC_API_BASE_URL || 'https://eamobileconnect.com/admin').replace(/\/$/, '');
+
+/**
+ * Member session (28 Oct 2026, the EMC port of TradePort's 18 Sep fix).
+ *
+ * The first sign-in used to lock the email to that browser ("Email Already
+ * Used" everywhere else), and an iPhone Home Screen app has its own storage,
+ * so members who added the app to their Home Screen were locked out. Now
+ * EMC's server hands each sign-in a session and the newest one wins; the app
+ * asks /api/auth/session/ on every open and only that answer signs it out.
+ */
+const MEMBER_SESSION_KEY = 'emcMemberSession';
+/** Why the server signed this device out, shown once on the login screen. */
+export const SIGNED_OUT_REASON_KEY = 'emcSignedOutReason';
+
+export async function getMemberSession(): Promise<string | null> {
+  try { return await AsyncStorage.getItem(MEMBER_SESSION_KEY); } catch { return null; }
+}
+export async function setMemberSession(token: string): Promise<void> {
+  try { await AsyncStorage.setItem(MEMBER_SESSION_KEY, token); } catch {}
+}
+export async function clearMemberSession(): Promise<void> {
+  try { await AsyncStorage.removeItem(MEMBER_SESSION_KEY); } catch {}
+}
+
+export type SessionVerdict = { ok: true } | { ok: false; reason: string };
+
+/**
+ * Ask EMC's server whether this session still holds the account.
+ * `null` means no verdict (network down, server busy): keep cached access.
+ */
+export async function checkMemberSessionRemote(email: string, session: string): Promise<SessionVerdict | null> {
+  try {
+    const res = await fetch(`${BASE_URL}/api/auth/session/`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+      body: JSON.stringify({ email: email.normalize('NFKC').trim().toLowerCase(), session }),
+    });
+    if (!res.ok) return null;
+    const data = await res.json();
+    if (data && data.ok === true) return { ok: true };
+    if (data && data.ok === false && typeof data.reason === 'string') return { ok: false, reason: data.reason };
+    return null;
+  } catch {
+    return null;
+  }
+}
 
 // Free-App admin site — where we report MT5 connect/heartbeat/disconnect so the
 // Super Admin can see live online/offline status (login + server only, never
@@ -63,6 +111,9 @@ export interface SymbolsResponse {
 export interface LicenseAuthBody {
   licence: string;
   phone_secret?: string;
+  /** The signed-in member, so they can re-activate their own licence elsewhere. */
+  email?: string;
+  session?: string;
 }
 
 export interface Owner {
@@ -127,15 +178,18 @@ class ApiService {
 
   async authenticate(authBody: AuthBody): Promise<Account> {
     if (!authBody?.email) throw new Error('Email is required');
-    // EMC endpoint: GET /api/auth/app/?email=...&use=0|1
-    // Returns: { message: "accept" | "used" | "admin" | "none", version: number }
+    // EMC endpoint: POST /api/auth/member/ { email }
+    // Returns: { message: "accept" | "admin" | "none", session?: string }
+    // A paid member or active admin gets a session, replacing any older one,
+    // so signing in on a new device or Home Screen app always works.
     const email = authBody.email.normalize('NFKC').trim().toLowerCase();
-    const endpoint = `${BASE_URL}/api/auth/app/?email=${encodeURIComponent(email)}`;
+    const endpoint = `${BASE_URL}/api/auth/member/`;
     let res: Response;
     try {
       res = await fetch(endpoint, {
-        method: 'GET',
-        headers: { 'Accept': 'application/json' },
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+        body: JSON.stringify({ email }),
       });
     } catch (networkError) {
       const hint = BASE_URL
@@ -143,18 +197,22 @@ class ApiService {
         : ' Set EXPO_PUBLIC_API_BASE_URL to your API host for native builds.';
       throw new Error(`Network error contacting auth service.${hint}`);
     }
-    let data: { message?: string; version?: number } = {};
+    let data: { message?: string; session?: string } = {};
     try {
-      data = (await res.json()) as { message?: string; version?: number };
+      data = (await res.json()) as { message?: string; session?: string };
     } catch (e) {
       throw new Error('Authentication failed');
     }
+    if (!res.ok && data?.message !== 'none') throw new Error('Authentication failed');
 
     const msg = (data?.message || '').toString();
-    // EMC message values: "accept" (paid+unused) | "used" (paid+used) | "admin" | "none"
-    const found = msg === 'accept' || msg === 'used' || msg === 'admin';
-    const paid = msg === 'accept' || msg === 'used' || msg === 'admin';
-    const used = msg === 'used';
+    const found = msg === 'accept' || msg === 'admin';
+    const paid = found;
+    // Nobody is locked to one device any more: the newest sign-in wins.
+    const used = false;
+    if (found && typeof data.session === 'string' && data.session) {
+      await setMemberSession(data.session);
+    }
 
     return {
       id: authBody.email,
@@ -164,17 +222,6 @@ class ApiService {
       used,
       invalidMentor: 0, // EMC has no mentor concept
     };
-  }
-
-  async lockEmail(email: string): Promise<void> {
-    if (!email) return;
-    const cleaned = email.trim().toLowerCase();
-    const endpoint = `${BASE_URL}/api/auth/app/?email=${encodeURIComponent(cleaned)}&use=1`;
-    try {
-      await fetch(endpoint, { method: 'GET', headers: { 'Accept': 'application/json' } });
-    } catch (e) {
-      console.warn('lockEmail failed (non-fatal):', e);
-    }
   }
 
   async getSignals(phoneSecret: string): Promise<SignalsResponse> {
@@ -216,8 +263,14 @@ class ApiService {
 
   async authenticateLicense(licenseBody: LicenseAuthBody): Promise<LicenseAuthResponse> {
     if (!licenseBody?.licence) return { message: 'error' };
-    // EMC endpoint: POST /api/auth/ with body { licence, phone_secret? }
+    // EMC endpoint: POST /api/auth/ with body { licence, phone_secret?, email?, session? }
+    // With the member's session, the member who first activated a licence can
+    // activate it again on a new device; anyone else still gets "used".
     const endpoint = `${BASE_URL}/api/auth/`;
+    const session = await getMemberSession();
+    if (session && licenseBody.email) {
+      licenseBody = { ...licenseBody, session, email: licenseBody.email.normalize('NFKC').trim().toLowerCase() };
+    }
 
     // Add timeout to avoid hanging forever on network issues
     const controller = new AbortController();
