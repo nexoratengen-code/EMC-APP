@@ -5,6 +5,7 @@ import { router, usePathname } from 'expo-router';
 import { useSidebar } from '@/providers/sidebar-provider';
 import { useTheme } from '@/providers/theme-provider';
 import { useApp } from '@/providers/app-provider';
+import { AbyssMenu } from '@/components/abyss-menu';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const SIDEBAR_WIDTH = 300;
@@ -53,8 +54,9 @@ const hexToRgbString = (hex: string): string => {
 
 export function Sidebar() {
   const { isOpen, close } = useSidebar();
-  const { eas, isBotActive, heroHidden, setHeroHidden } = useApp();
-  const { glowColor, setGlowColor } = useTheme();
+  const { eas, isBotActive, heroHidden, setHeroHidden, isTestFlightRunning } = useApp();
+  const { glowColor, setGlowColor, glassMode } = useTheme();
+  const abyss = glassMode === 'abyss';
   const a = hexToRgbString(glowColor);
   const ac = glowColor;
   const pathname = usePathname();
@@ -93,6 +95,21 @@ export function Sidebar() {
       </Animated.View>
 
       <Animated.View style={[styles.sidebar, { transform: [{ translateX: slideAnim }] }]}>
+        {abyss && (
+          <AbyssMenu
+            items={[
+              ...NAV_ITEMS.map((i) => ({ key: i.key, label: i.label, route: i.route })),
+              { key: '/scanner', label: 'Chart Scanner', sub: 'AI-powered trade analysis', route: '/(tabs)/scanner' },
+              { key: '/license', label: 'Add New EA', sub: 'Have a valid license key', route: '/license' },
+            ]}
+            activeKey={pathname === '' || pathname === '/index' ? '/' : pathname}
+            eaName={primaryEA?.name || null}
+            running={isTestFlightRunning}
+            onNav={handleNav}
+            onClose={close}
+          />
+        )}
+        {!abyss && <>
         <View style={styles.sidebarShine} />
         <View style={styles.sidebarEdge} />
 
@@ -239,6 +256,7 @@ export function Sidebar() {
           <View style={[styles.footerDot, { backgroundColor: glowColor }]} />
           <Text style={styles.footerText}>v1.0</Text>
         </View>
+        </>}
       </Animated.View>
     </>
   );
