@@ -181,6 +181,16 @@ export default function LoginScreen() {
         modal={{ visible: modalVisible, title: modalTitle, message: modalMessage }}
         onDismissModal={() => setModalVisible(false)}
         onReactivate={() => { setModalVisible(false); setPaywallNotice(''); setPaymentVisible(true); }}
+        onReactivateLink={() => {
+          if (!email.normalize('NFKC').includes('@')) {
+            setModalTitle('Enter your email');
+            setModalMessage('Type the email you paid with above, then tap Reactivate your account.');
+            setModalVisible(true);
+            return;
+          }
+          setPaywallNotice('');
+          setPaymentVisible(true);
+        }}
       />
     );
   }

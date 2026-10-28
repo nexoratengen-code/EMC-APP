@@ -28,6 +28,8 @@ type Props = {
   modal: { visible: boolean; title: string; message: string };
   onDismissModal: () => void;
   onReactivate: () => void;
+  /** "Access expired? Reactivate your account" under the form (Phase 1, as on TradePort). */
+  onReactivateLink: () => void;
 };
 
 export function AbyssLogin(p: Props) {
@@ -135,6 +137,13 @@ export function AbyssLogin(p: Props) {
             </View>
           </Animated.View>
 
+          <Animated.View style={[styles.reactivateRow, { opacity: foot }]}>
+            <Text style={styles.reactivateText}>Access expired?</Text>
+            <TouchableOpacity onPress={p.onReactivateLink} activeOpacity={0.7} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }} testID="reactivate-link">
+              <Text style={styles.reactivateLink}>Reactivate your account</Text>
+            </TouchableOpacity>
+          </Animated.View>
+
           <Animated.View style={[styles.foot, { opacity: foot }]}>
             <View style={styles.legalRow}>
               <TouchableOpacity onPress={() => Linking.openURL('https://eamobileconnect.com/admin/info/about/terms.php').catch(() => {})}>
@@ -194,6 +203,9 @@ const styles = StyleSheet.create({
 
   button: { marginTop: 44 },
 
+  reactivateRow: { flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 6, marginTop: 22 },
+  reactivateText: { color: LUX.grey, fontSize: 13, fontWeight: '300' },
+  reactivateLink: { color: LUX.white, fontSize: 13, fontWeight: '500', textDecorationLine: 'underline' },
   foot: { marginTop: 'auto', paddingTop: 36 },
   legalRow: { flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 10, marginBottom: 8 },
   legalLink: { color: LUX.grey, fontSize: 12, fontWeight: '400' },
