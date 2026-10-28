@@ -198,6 +198,28 @@ export function AbyssHome(p: Props) {
         </Animated.Text>
 
         <Animated.View style={[styles.list, { opacity: list }]}>
+          {/* The EA card, as in the side menu (and where TradePort shows its EA):
+              picture, name and live status; green glow while the robot runs. */}
+          <View testID="ea-info-card" style={[styles.eaCard, p.running ? glow('34, 197, 94', 0.8) : glow(EMC_BLUE, 0.55)]}>
+            <View style={styles.eaAvatar}>
+              {p.image ? (
+                <Image source={{ uri: p.image }} style={styles.portraitImg} resizeMode="cover" />
+              ) : (
+                <Image source={require('@/assets/images/emc-robot-glow.png')} style={[styles.portraitImg, { transform: [{ scale: 1.45 }] }]} resizeMode="contain" />
+              )}
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.eaCardName} numberOfLines={1}>{p.name}</Text>
+              <View style={styles.eaCardStatusRow}>
+                <View style={[styles.dot, { backgroundColor: p.running ? '#22C55E' : 'rgba(255,255,255,0.35)' },
+                  web && p.running && ({ boxShadow: '0 0 8px rgba(34,197,94,0.9)' } as any)]} />
+                <Text style={[styles.statusText, p.running && { color: '#22C55E' }]} numberOfLines={1}>
+                  {p.running ? (p.runningDetail ? `RUNNING · ${p.runningDetail}` : 'RUNNING') : 'IDLE'}
+                </Text>
+              </View>
+            </View>
+          </View>
+
           {p.otherEAs.length > 0 && (
             <>
               <Text style={styles.listLabel}>YOUR EAS</Text>
@@ -290,6 +312,17 @@ const styles = StyleSheet.create({
     backgroundColor: '#0A0A0B', borderWidth: 1, borderColor: 'rgba(255,255,255,0.16)',
   },
   cardDanger: { borderColor: 'rgba(248,113,113,0.28)' },
+  eaCard: {
+    flexDirection: 'row', alignItems: 'center', gap: 14,
+    borderRadius: 38, paddingVertical: 12, paddingLeft: 12, paddingRight: 20,
+    backgroundColor: '#0A0A0B', borderWidth: 1, borderColor: 'rgba(255,255,255,0.16)',
+  },
+  eaAvatar: {
+    width: 52, height: 52, borderRadius: 26, overflow: 'hidden',
+    borderWidth: 1, borderColor: 'rgba(255,255,255,0.22)', backgroundColor: '#000',
+  },
+  eaCardName: { color: LUX.white, fontSize: 18, fontWeight: '300', letterSpacing: -0.3 },
+  eaCardStatusRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 4 },
   cardIcon: {
     width: 48, height: 48, borderRadius: 24, alignItems: 'center', justifyContent: 'center',
     borderWidth: 1, borderColor: 'rgba(255,255,255,0.18)',
