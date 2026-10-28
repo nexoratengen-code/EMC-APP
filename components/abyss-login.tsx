@@ -1,13 +1,13 @@
-import React, { useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
   View, Text, StyleSheet, TextInput, TouchableOpacity, SafeAreaView, Linking,
-  Platform, KeyboardAvoidingView, ScrollView, Animated,
+  Platform, KeyboardAvoidingView, ScrollView, Animated, Image, Easing, AccessibilityInfo,
 } from 'react-native';
 import { LUX, LuxMark, LuxPill, LuxRule, rise, useEntrance } from '@/components/abyss-lux';
 
 /**
  * Sign in, minimal luxury, matching the start page: black page, the silver
- * mark, "Welcome Back" huge and thin, a hairline, and fields that are only a
+ * mark, EMC's glowing robot (dev's ask), "Welcome Back" huge and thin, a hairline, and fields that are only a
  * small label over a fine underline that turns white when in use. White pill.
  *
  * Presentation only: app/login.tsx keeps the whole check (mentor + email,
@@ -15,6 +15,7 @@ import { LUX, LuxMark, LuxPill, LuxRule, rise, useEntrance } from '@/components/
  * the old screen.
  */
 const web = Platform.OS === 'web';
+const native = !web;
 
 type Props = {
   mentorId: string;
@@ -31,7 +32,23 @@ type Props = {
 
 export function AbyssLogin(p: Props) {
   const [focus, setFocus] = useState<'mentor' | 'email' | null>(null);
-  const [mark, title, rule, tagline, form, foot] = useEntrance(6, { delay: 120, duration: 800, first: 150 });
+  const [mark, art, title, rule, tagline, form, foot] = useEntrance(7, { delay: 120, duration: 800, first: 150 });
+  const float = useRef(new Animated.Value(0)).current;
+
+  // The robot hovers, as on the start page.
+  useEffect(() => {
+    let loop: Animated.CompositeAnimation | null = null;
+    let cancelled = false;
+    AccessibilityInfo.isReduceMotionEnabled().catch(() => false).then((reduce) => {
+      if (cancelled || reduce) return;
+      loop = Animated.loop(Animated.sequence([
+        Animated.timing(float, { toValue: 1, duration: 4200, easing: Easing.inOut(Easing.sin), useNativeDriver: native }),
+        Animated.timing(float, { toValue: 0, duration: 4200, easing: Easing.inOut(Easing.sin), useNativeDriver: native }),
+      ]));
+      loop.start();
+    });
+    return () => { cancelled = true; loop?.stop(); };
+  }, [float]);
 
   const underline = (name: 'mentor' | 'email') => [
     styles.underline,
@@ -51,6 +68,22 @@ export function AbyssLogin(p: Props) {
         <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
           <Animated.View style={{ opacity: mark }}>
             <LuxMark />
+          </Animated.View>
+
+          <Animated.View
+            style={[
+              styles.artWrap,
+              {
+                opacity: art,
+                transform: [
+                  { scale: art.interpolate({ inputRange: [0, 1], outputRange: [0.94, 1] }) },
+                  { translateY: float.interpolate({ inputRange: [0, 1], outputRange: [0, -6] }) },
+                ],
+              },
+            ]}
+            pointerEvents="none"
+          >
+            <Image source={require('@/assets/images/emc-robot-glow.png')} style={styles.art} resizeMode="contain" />
           </Animated.View>
 
           <View style={styles.headBlock}>
@@ -146,7 +179,9 @@ const styles = StyleSheet.create({
     width: '100%', maxWidth: 480, alignSelf: 'center',
   },
 
-  headBlock: { marginTop: 56, marginBottom: 40 },
+  artWrap: { height: 190, marginHorizontal: -28, marginTop: 4, alignItems: 'center', justifyContent: 'center' },
+  art: { width: '100%', height: '100%', transform: [{ scale: 1.2 }] },
+  headBlock: { marginTop: 6, marginBottom: 36 },
   title: { color: LUX.white, fontSize: 46, lineHeight: 52, fontWeight: '200', letterSpacing: -1.6 },
   tagline: { color: LUX.grey, fontSize: 15, fontWeight: '300' },
 
