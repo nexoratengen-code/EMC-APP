@@ -28,7 +28,7 @@ const TEXT_CASE_MAP: Record<TextCase, string> = {
   normal: 'none', upper: 'uppercase', lower: 'lowercase', capitalize: 'capitalize',
 };
 
-const GOOGLE_FONTS_URL = 'https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500;600;700&family=Nunito:wght@400;600;700;800;900&family=Roboto+Condensed:wght@400;500;600;700;800&family=Playfair+Display:wght@400;600;700;800;900&family=Space+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&family=Outfit:wght@400;500;600;700;800;900&family=Sora:wght@400;500;600;700;800&family=Inter+Tight:wght@400;500;600;700;800;900&display=swap';
+const GOOGLE_FONTS_URL = 'https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500;600;700&family=Nunito:wght@400;600;700;800;900&family=Roboto+Condensed:wght@400;500;600;700;800&family=Playfair+Display:wght@400;600;700;800;900&family=Space+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&family=Outfit:wght@400;500;600;700;800;900&family=Sora:wght@200;300;400;500;600;700;800&family=Inter+Tight:wght@400;500;600;700;800;900&display=swap';
 
 export interface ThemeColors {
   accent: string; accentRgb: string; accentLight: string; accentGlow: string; gradientStart: string; textMuted: string;
