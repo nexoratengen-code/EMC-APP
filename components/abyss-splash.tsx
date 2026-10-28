@@ -3,33 +3,34 @@ import {
   View, Text, StyleSheet, TouchableOpacity, Image, Platform, SafeAreaView, Animated, Easing, AccessibilityInfo,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
+import { ArrowRight } from 'lucide-react-native';
 import { ABYSS } from '@/components/abyss-connect';
 
 /**
- * The first screen in the Abyss style, after Conceptzilla's "Abyss" start
- * screen: one tall frosted blue glass panel with the mark at the top and the
- * name set large at the bottom, and a single solid blue START NOW under it.
- * Same words as the old splash; only the look changed.
+ * The first screen in the Abyss style, after Shakuro's "Finance Mobile Banking
+ * App" start screen (Dribbble 26139144, picked 28 Oct 2026): a black page, one
+ * large picture in the top half fading into it, the name set big and light at
+ * the bottom left, one grey line, and a slim pill button with an arrow.
+ * The picture is EMC's own robot (assets/images/emc-robot-hero.jpg, the app
+ * icon with its grey ground taken down to black). Same words as the old splash.
  *
- * Motion is slow and quiet: the panel rises in, the name, the words and the
- * button follow in turn, and the light inside the glass drifts. All of it is
- * skipped when the phone asks for reduced motion.
+ * Motion is slow and quiet, and skipped when the phone asks for reduced motion.
  */
 const web = Platform.OS === 'web';
 const native = !web;
+const BLACK = '#030509';
 
-/** Fade in and rise into place. */
 const rise = (v: Animated.Value) => ({
   opacity: v,
   transform: [{ translateY: v.interpolate({ inputRange: [0, 1], outputRange: [18, 0] }) }],
 });
 
 export function AbyssSplash({ onStart }: { onStart: () => void }) {
-  const panel = useRef(new Animated.Value(0)).current;
+  const art = useRef(new Animated.Value(0)).current;
   const title = useRef(new Animated.Value(0)).current;
   const words = useRef(new Animated.Value(0)).current;
   const button = useRef(new Animated.Value(0)).current;
-  const drift = useRef(new Animated.Value(0)).current;
+  const float = useRef(new Animated.Value(0)).current;
   const press = useRef(new Animated.Value(1)).current;
 
   useEffect(() => {
@@ -38,26 +39,27 @@ export function AbyssSplash({ onStart }: { onStart: () => void }) {
     AccessibilityInfo.isReduceMotionEnabled().catch(() => false).then((reduce) => {
       if (cancelled) return;
       if (reduce) {
-        [panel, title, words, button].forEach((v) => v.setValue(1));
+        [art, title, words, button].forEach((v) => v.setValue(1));
         return;
       }
       const ease = Easing.out(Easing.cubic);
-      Animated.stagger(140, [
-        Animated.timing(panel, { toValue: 1, duration: 700, easing: ease, useNativeDriver: native }),
-        Animated.timing(title, { toValue: 1, duration: 600, easing: ease, useNativeDriver: native }),
-        Animated.timing(words, { toValue: 1, duration: 600, easing: ease, useNativeDriver: native }),
-        Animated.timing(button, { toValue: 1, duration: 600, easing: ease, useNativeDriver: native }),
+      Animated.sequence([
+        Animated.timing(art, { toValue: 1, duration: 900, easing: ease, useNativeDriver: native }),
+        Animated.stagger(140, [title, words, button].map((v) =>
+          Animated.timing(v, { toValue: 1, duration: 600, easing: ease, useNativeDriver: native }),
+        )),
       ]).start();
+      // The robot hovers: a few pixels up and down, very slowly.
       loop = Animated.loop(
         Animated.sequence([
-          Animated.timing(drift, { toValue: 1, duration: 7000, easing: Easing.inOut(Easing.sin), useNativeDriver: native }),
-          Animated.timing(drift, { toValue: 0, duration: 7000, easing: Easing.inOut(Easing.sin), useNativeDriver: native }),
+          Animated.timing(float, { toValue: 1, duration: 4000, easing: Easing.inOut(Easing.sin), useNativeDriver: native }),
+          Animated.timing(float, { toValue: 0, duration: 4000, easing: Easing.inOut(Easing.sin), useNativeDriver: native }),
         ]),
       );
       loop.start();
     });
     return () => { cancelled = true; loop?.stop(); };
-  }, [panel, title, words, button, drift]);
+  }, [art, title, words, button, float]);
 
   const pressTo = (v: number) =>
     Animated.spring(press, { toValue: v, speed: 40, bounciness: 6, useNativeDriver: native }).start();
@@ -65,111 +67,91 @@ export function AbyssSplash({ onStart }: { onStart: () => void }) {
   const buttonRise = rise(button);
 
   return (
-    <SafeAreaView
-      style={[
-        styles.container,
-        web && ({
-          backgroundImage: `radial-gradient(ellipse 80% 40% at 50% 100%, rgba(${ABYSS.blueRgb}, 0.22) 0%, transparent 70%)`,
-        } as any),
-      ]}
-    >
+    <SafeAreaView style={styles.container}>
       <View style={styles.inner}>
-        <Animated.View style={[styles.panelWrap, rise(panel)]}>
+        <Animated.View
+          style={[
+            styles.artWrap,
+            {
+              opacity: art,
+              transform: [
+                { scale: art.interpolate({ inputRange: [0, 1], outputRange: [1.06, 1] }) },
+                { translateY: float.interpolate({ inputRange: [0, 1], outputRange: [0, -8] }) },
+              ],
+            },
+          ]}
+        >
+          <Image
+            testID="splash-app-icon"
+            source={require('../assets/images/emc-robot-hero.jpg')}
+            style={styles.art}
+            resizeMode="contain"
+          />
+          {/* The picture melts into the page at the bottom and the sides. */}
           <LinearGradient
-            colors={['#6A93FF', '#2F58E0', '#1A2A7A', '#0F1636']}
-            locations={[0, 0.35, 0.75, 1]}
-            start={{ x: 0.1, y: 0 }}
-            end={{ x: 0.9, y: 1 }}
-            style={styles.panel}
-          >
-            {/* Soft light pooled in the upper left, the frosted look of the reference. */}
-            <Animated.View
-              pointerEvents="none"
-              style={[
-                styles.bloom,
-                {
-                  transform: [
-                    { translateX: drift.interpolate({ inputRange: [0, 1], outputRange: [-24, 36] }) },
-                    { translateY: drift.interpolate({ inputRange: [0, 1], outputRange: [-10, 28] }) },
-                    { scale: drift.interpolate({ inputRange: [0, 1], outputRange: [1, 1.12] }) },
-                  ],
-                },
-                web && ({
-                  backgroundImage: 'radial-gradient(circle at 30% 25%, rgba(255,255,255,0.45) 0%, rgba(255,255,255,0.12) 35%, transparent 65%)',
-                  filter: 'blur(8px)',
-                } as any),
-              ]}
-            />
-            <LinearGradient
-              colors={['rgba(255,255,255,0.18)', 'rgba(255,255,255,0)']}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 0, y: 1 }}
-              style={styles.sheen}
-              pointerEvents="none"
-            />
-
-            <View style={styles.markRow}>
-              <Image
-                testID="splash-app-icon"
-                source={require('../assets/images/icon.png')}
-                style={styles.mark}
-                resizeMode="contain"
-              />
-            </View>
-
-            <View>
-              <Animated.Text style={[styles.title, rise(title)]}>EA Mobile{'\n'}Connect</Animated.Text>
-              <Animated.Text style={[styles.description, rise(words)]}>
-                A cutting-edge mobile hosting platform designed to empower traders with a secure, reliable, and user-friendly environment for running their automated trading systems. Seamlessly manage your Expert Advisors (EAs) on the go, ensuring optimal performance and peace of mind.
-              </Animated.Text>
-            </View>
-          </LinearGradient>
+            colors={['rgba(3,5,9,0)', 'rgba(3,5,9,0.85)', BLACK]}
+            locations={[0.55, 0.85, 1]}
+            style={StyleSheet.absoluteFill}
+            pointerEvents="none"
+          />
+          <LinearGradient
+            colors={[BLACK, 'rgba(3,5,9,0)', 'rgba(3,5,9,0)', BLACK]}
+            locations={[0, 0.12, 0.88, 1]}
+            start={{ x: 0, y: 0.5 }}
+            end={{ x: 1, y: 0.5 }}
+            style={StyleSheet.absoluteFill}
+            pointerEvents="none"
+          />
         </Animated.View>
 
-        <Animated.View style={{ opacity: buttonRise.opacity, transform: [...buttonRise.transform, { scale: press }] }}>
-          <TouchableOpacity
-            onPress={onStart}
-            onPressIn={() => pressTo(0.96)}
-            onPressOut={() => pressTo(1)}
-            activeOpacity={0.9}
-            style={[styles.button, web && ({ boxShadow: `0 12px 34px rgba(${ABYSS.blueRgb}, 0.4)` } as any)]}
-            testID="splash-start"
-          >
-            <Text style={styles.buttonText}>START NOW</Text>
-          </TouchableOpacity>
-        </Animated.View>
+        <View style={styles.bottom}>
+          <Animated.Text style={[styles.title, rise(title)]}>EA Mobile{'\n'}Connect</Animated.Text>
+          <Animated.Text style={[styles.description, rise(words)]}>
+            A cutting-edge mobile hosting platform designed to empower traders with a secure, reliable, and user-friendly environment for running their automated trading systems. Seamlessly manage your Expert Advisors (EAs) on the go, ensuring optimal performance and peace of mind.
+          </Animated.Text>
+
+          <Animated.View style={{ opacity: buttonRise.opacity, transform: [...buttonRise.transform, { scale: press }] }}>
+            <TouchableOpacity
+              onPress={onStart}
+              onPressIn={() => pressTo(0.97)}
+              onPressOut={() => pressTo(1)}
+              activeOpacity={0.9}
+              style={styles.button}
+              testID="splash-start"
+            >
+              <Text style={styles.buttonText}>Start now</Text>
+              <View style={[styles.arrow, web && ({ boxShadow: `0 0 18px rgba(${ABYSS.blueRgb}, 0.55)` } as any)]}>
+                <ArrowRight color="#FFFFFF" size={18} strokeWidth={2.4} />
+              </View>
+            </TouchableOpacity>
+          </Animated.View>
+        </View>
       </View>
     </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: ABYSS.ground },
-  inner: { flex: 1, width: '100%', maxWidth: 480, alignSelf: 'center', padding: 14, paddingBottom: 22 },
+  container: { flex: 1, backgroundColor: BLACK },
+  inner: { flex: 1, width: '100%', maxWidth: 480, alignSelf: 'center' },
 
-  panelWrap: { flex: 1, marginBottom: 16 },
-  panel: {
-    flex: 1, borderRadius: 34, overflow: 'hidden',
-    borderWidth: 1, borderColor: 'rgba(255,255,255,0.16)',
-    paddingHorizontal: 26, paddingTop: 28, paddingBottom: 30, justifyContent: 'space-between',
-  },
-  bloom: { position: 'absolute', top: -40, left: -40, right: -40, height: '70%' },
-  sheen: { position: 'absolute', top: 0, left: 0, right: 0, height: '45%' },
+  artWrap: { flex: 1, minHeight: 260, justifyContent: 'center', overflow: 'hidden' },
+  art: { width: '118%', height: '100%', alignSelf: 'center' },
 
-  markRow: { alignItems: 'center' },
-  mark: {
-    width: 64, height: 64, borderRadius: 18,
-    borderWidth: 1, borderColor: 'rgba(255,255,255,0.28)',
-  },
-
+  bottom: { paddingHorizontal: 24, paddingBottom: 26 },
   title: {
-    color: '#FFFFFF', fontSize: 46, lineHeight: 50, fontWeight: '600', letterSpacing: -1.2, marginBottom: 16,
+    color: '#FFFFFF', fontSize: 42, lineHeight: 46, fontWeight: '300', letterSpacing: -1.4, marginBottom: 14,
   },
-  description: { color: 'rgba(255,255,255,0.78)', fontSize: 14, lineHeight: 21 },
+  description: { color: 'rgba(255,255,255,0.5)', fontSize: 13, lineHeight: 20, marginBottom: 26 },
 
   button: {
-    height: 58, borderRadius: 18, backgroundColor: ABYSS.blue,
+    height: 60, borderRadius: 30, paddingLeft: 24, paddingRight: 7,
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+    backgroundColor: '#0E1118', borderWidth: 1, borderColor: 'rgba(255,255,255,0.12)',
+  },
+  buttonText: { color: '#FFFFFF', fontSize: 15, fontWeight: '500' },
+  arrow: {
+    width: 46, height: 46, borderRadius: 23, backgroundColor: ABYSS.blue,
     alignItems: 'center', justifyContent: 'center',
   },
-  buttonText: { color: '#FFFFFF', fontSize: 14, fontWeight: '700', letterSpacing: 1.6 },
 });
