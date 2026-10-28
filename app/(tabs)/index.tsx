@@ -3,6 +3,7 @@ import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Image, ImageBackg
 import { Play, Square, TrendingUp, Trash2, Plus, Menu, BarChart3 } from 'lucide-react-native';
 import { router } from 'expo-router';
 import { RobotLogo } from '@/components/robot-logo';
+import { AbyssSplash } from '@/components/abyss-splash';
 import { PageBackground } from '@/components/page-background';
 import { AnimatedButton } from '@/components/animated-button';
 import QuickConfigModal from '@/components/quick-config-modal';
@@ -223,6 +224,9 @@ export default function HomeScreen() {
   ];
 
   // Show splash screen for first-time users
+  if (isFirstTime && glassMode === 'abyss') {
+    return <AbyssSplash onStart={handleStartNow} />;
+  }
   if (isFirstTime) {
     return (
       <View style={[styles.splashContainer, Platform.OS === 'web' && { backgroundImage: 'linear-gradient(135deg, rgba(' + a + ', 0.95) 0%, rgba(' + a + ', 0.7) 20%, rgba(' + a + ', 0.4) 40%, rgba(' + a + ', 0.2) 60%, rgba(' + a + ', 0.1) 80%, rgba(0, 0, 0, 0.8) 95%, rgba(0, 0, 0, 1) 100%)' }]}>
