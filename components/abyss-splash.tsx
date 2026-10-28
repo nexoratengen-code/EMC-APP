@@ -11,14 +11,17 @@ import { ABYSS } from '@/components/abyss-connect';
  * App" start screen (Dribbble 26139144, picked 28 Oct 2026): a black page, one
  * large picture in the top half fading into it, the name set big and light at
  * the bottom left, one grey line, and a slim pill button with an arrow.
- * The picture is EMC's own robot (assets/images/emc-robot-hero.jpg, the app
- * icon with its grey ground taken down to black). Same words as the old splash.
+ * The picture is EMC's own robot (assets/images/emc-robot-hero.jpg: the app
+ * icon with its grey ground taken down to black, set on a larger black canvas
+ * and faded to pure black at every edge, so the glow is never cut off).
+ * Same words as the old splash.
  *
  * Motion is slow and quiet, and skipped when the phone asks for reduced motion.
  */
 const web = Platform.OS === 'web';
 const native = !web;
-const BLACK = '#030509';
+// Pure black, the same as the picture's faded edges, so no box shows around it.
+const BLACK = '#000000';
 
 const rise = (v: Animated.Value) => ({
   opacity: v,
@@ -87,18 +90,11 @@ export function AbyssSplash({ onStart }: { onStart: () => void }) {
             style={styles.art}
             resizeMode="contain"
           />
-          {/* The picture melts into the page at the bottom and the sides. */}
+          {/* The picture's own edges already fade to black; this only eases it
+              into the words below. */}
           <LinearGradient
-            colors={['rgba(3,5,9,0)', 'rgba(3,5,9,0.85)', BLACK]}
-            locations={[0.55, 0.85, 1]}
-            style={StyleSheet.absoluteFill}
-            pointerEvents="none"
-          />
-          <LinearGradient
-            colors={[BLACK, 'rgba(3,5,9,0)', 'rgba(3,5,9,0)', BLACK]}
-            locations={[0, 0.12, 0.88, 1]}
-            start={{ x: 0, y: 0.5 }}
-            end={{ x: 1, y: 0.5 }}
+            colors={['rgba(0,0,0,0)', BLACK]}
+            locations={[0.75, 1]}
             style={StyleSheet.absoluteFill}
             pointerEvents="none"
           />
@@ -135,8 +131,11 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: BLACK },
   inner: { flex: 1, width: '100%', maxWidth: 480, alignSelf: 'center' },
 
+  // Clipped only where it meets the screen's own edges; keeps the page from scrolling sideways.
   artWrap: { flex: 1, minHeight: 260, justifyContent: 'center', overflow: 'hidden' },
-  art: { width: '118%', height: '100%', alignSelf: 'center' },
+  // Drawn larger than its box: the picture's edges are already black, so the
+  // overflow is invisible and the robot fills the top half.
+  art: { width: '100%', height: '100%', transform: [{ scale: 1.3 }] },
 
   bottom: { paddingHorizontal: 24, paddingBottom: 26 },
   title: {
