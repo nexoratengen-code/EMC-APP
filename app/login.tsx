@@ -6,6 +6,7 @@ import { useApp } from '@/providers/app-provider';
 import { useTheme } from '@/providers/theme-provider';
 import { apiService } from '@/services/api';
 import { Paywall } from '@/components/paywall';
+import { AbyssLogin } from '@/components/abyss-login';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 
@@ -23,7 +24,7 @@ export default function LoginScreen() {
   const [paywallNotice, setPaywallNotice] = useState<string>('');
   const recheckRef = useRef(false);
   const { setUser, user, eas } = useApp();
-  const { theme } = useTheme();
+  const { theme, glassMode } = useTheme();
   const a = theme.accentRgb;
   const ac = theme.accent;
 
@@ -148,6 +149,23 @@ export default function LoginScreen() {
         checking={isLoading}
         onBack={() => { setPaymentVisible(false); setPaywallNotice(''); }}
         onContinue={() => { recheckRef.current = true; handleProceed(); }}
+      />
+    );
+  }
+
+  if (glassMode === 'abyss') {
+    return (
+      <AbyssLogin
+        mentorId={mentorId}
+        setMentorId={setMentorId}
+        email={email}
+        setEmail={setEmail}
+        isLoading={isLoading}
+        isPaymentProcessing={isPaymentProcessing}
+        onProceed={handleProceed}
+        modal={{ visible: modalVisible, title: modalTitle, message: modalMessage }}
+        onDismissModal={() => setModalVisible(false)}
+        onReactivate={() => { setModalVisible(false); setPaywallNotice(''); setPaymentVisible(true); }}
       />
     );
   }
