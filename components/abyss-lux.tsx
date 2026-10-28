@@ -77,9 +77,12 @@ export function LuxRule({ progress, width = 56 }: { progress: Animated.Value; wi
  * The white pill: black words, centred. Its only motion is a slow sheen that
  * crosses it every few seconds, and a small give when pressed.
  */
-export function LuxPill({ label, onPress, busy = false, busyLabel, testID }: {
+export function LuxPill({ label, onPress, busy = false, busyLabel, testID, variant = 'solid' }: {
   label: string; onPress: () => void; busy?: boolean; busyLabel?: string; testID?: string;
+  /** 'outline' is the quiet one (Disconnect, Cancel): hairline edge, white words, no sheen. */
+  variant?: 'solid' | 'outline';
 }) {
+  const outline = variant === 'outline';
   const [width, setWidth] = useState(0);
   const sheen = useRef(new Animated.Value(0)).current;
   const press = useRef(new Animated.Value(1)).current;
@@ -87,7 +90,7 @@ export function LuxPill({ label, onPress, busy = false, busyLabel, testID }: {
   useEffect(() => {
     let loop: Animated.CompositeAnimation | null = null;
     let cancelled = false;
-    if (busy) return;
+    if (busy || outline) return;
     AccessibilityInfo.isReduceMotionEnabled().catch(() => false).then((reduce) => {
       if (cancelled || reduce) return;
       loop = Animated.loop(Animated.sequence([
@@ -98,7 +101,7 @@ export function LuxPill({ label, onPress, busy = false, busyLabel, testID }: {
       loop.start();
     });
     return () => { cancelled = true; loop?.stop(); sheen.setValue(0); };
-  }, [busy, sheen]);
+  }, [busy, outline, sheen]);
 
   const pressTo = (v: number) =>
     Animated.spring(press, { toValue: v, speed: 40, bounciness: 4, useNativeDriver: native }).start();
@@ -111,12 +114,12 @@ export function LuxPill({ label, onPress, busy = false, busyLabel, testID }: {
         onPressOut={() => pressTo(1)}
         disabled={busy}
         activeOpacity={0.92}
-        style={[styles.pill, busy && { opacity: 0.8 }]}
+        style={[styles.pill, outline && styles.pillOutline, busy && { opacity: 0.8 }]}
         onLayout={(e) => setWidth(e.nativeEvent.layout.width)}
         accessibilityRole="button"
         testID={testID}
       >
-        {width > 0 && (
+        {width > 0 && !outline && (
           <View style={styles.sheenClip} pointerEvents="none">
             <Animated.View
               style={[styles.sheen, { transform: [
@@ -135,11 +138,11 @@ export function LuxPill({ label, onPress, busy = false, busyLabel, testID }: {
         )}
         {busy ? (
           <View style={styles.row}>
-            <ActivityIndicator color="#000000" size="small" />
-            <Text style={styles.pillText}>{busyLabel ?? label}</Text>
+            <ActivityIndicator color={outline ? '#FFFFFF' : '#000000'} size="small" />
+            <Text style={[styles.pillText, outline && { color: '#FFFFFF' }]}>{busyLabel ?? label}</Text>
           </View>
         ) : (
-          <Text style={styles.pillText}>{label}</Text>
+          <Text style={[styles.pillText, outline && { color: '#FFFFFF' }]}>{label}</Text>
         )}
       </TouchableOpacity>
     </Animated.View>
@@ -162,6 +165,7 @@ const styles = StyleSheet.create({
     height: 58, borderRadius: 29, backgroundColor: '#FFFFFF',
     alignItems: 'center', justifyContent: 'center',
   },
+  pillOutline: { backgroundColor: 'transparent', borderWidth: 1, borderColor: 'rgba(255,255,255,0.24)' },
   sheenClip: { ...StyleSheet.absoluteFillObject, borderRadius: 29, overflow: 'hidden' },
   sheen: { position: 'absolute', top: -10, bottom: -10, left: 0, width: 110 },
   row: { flexDirection: 'row', alignItems: 'center', gap: 10 },
