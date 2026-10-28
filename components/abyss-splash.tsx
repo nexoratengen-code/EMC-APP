@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
   View, Text, StyleSheet, TouchableOpacity, Image, Platform, SafeAreaView, Animated, Easing, AccessibilityInfo,
 } from 'react-native';
@@ -108,23 +108,118 @@ export function AbyssSplash({ onStart }: { onStart: () => void }) {
           </Animated.Text>
 
           <Animated.View style={{ opacity: buttonRise.opacity, transform: [...buttonRise.transform, { scale: press }] }}>
-            <TouchableOpacity
-              onPress={onStart}
+            <StartButton
+              onStart={onStart}
               onPressIn={() => pressTo(0.97)}
               onPressOut={() => pressTo(1)}
-              activeOpacity={0.9}
-              style={styles.button}
-              testID="splash-start"
-            >
-              <Text style={styles.buttonText}>Start now</Text>
-              <View style={[styles.arrow, web && ({ boxShadow: `0 0 18px rgba(${ABYSS.blueRgb}, 0.55)` } as any)]}>
-                <ArrowRight color="#FFFFFF" size={18} strokeWidth={2.4} />
-              </View>
-            </TouchableOpacity>
+            />
           </Animated.View>
         </View>
       </View>
     </SafeAreaView>
+  );
+}
+
+/**
+ * The pill button, alive but calm: a soft light sweeps across it, the arrow
+ * slides out to the right and back in from the left, and the blue circle's
+ * glow breathes. One cycle every 3.6 s. Still when reduced motion is on.
+ */
+function StartButton({ onStart, onPressIn, onPressOut }: {
+  onStart: () => void; onPressIn: () => void; onPressOut: () => void;
+}) {
+  const [width, setWidth] = useState(0);
+  const sweep = useRef(new Animated.Value(0)).current;
+  const arrow = useRef(new Animated.Value(0)).current;
+  const glow = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    let loops: Animated.CompositeAnimation[] = [];
+    let cancelled = false;
+    AccessibilityInfo.isReduceMotionEnabled().catch(() => false).then((reduce) => {
+      if (cancelled || reduce) return;
+      const ease = Easing.inOut(Easing.cubic);
+      loops = [
+        Animated.loop(Animated.sequence([
+          Animated.delay(1200),
+          Animated.timing(sweep, { toValue: 1, duration: 1400, easing: ease, useNativeDriver: native }),
+          Animated.timing(sweep, { toValue: 0, duration: 0, useNativeDriver: native }),
+          Animated.delay(1000),
+        ])),
+        Animated.loop(Animated.sequence([
+          Animated.delay(1600),
+          Animated.timing(arrow, { toValue: 1, duration: 380, easing: Easing.in(Easing.cubic), useNativeDriver: native }),
+          Animated.timing(arrow, { toValue: -1, duration: 0, useNativeDriver: native }),
+          Animated.timing(arrow, { toValue: 0, duration: 420, easing: Easing.out(Easing.cubic), useNativeDriver: native }),
+          Animated.delay(1200),
+        ])),
+        Animated.loop(Animated.sequence([
+          Animated.timing(glow, { toValue: 1, duration: 1800, easing: Easing.inOut(Easing.sin), useNativeDriver: native }),
+          Animated.timing(glow, { toValue: 0, duration: 1800, easing: Easing.inOut(Easing.sin), useNativeDriver: native }),
+        ])),
+      ];
+      loops.forEach((l) => l.start());
+    });
+    return () => { cancelled = true; loops.forEach((l) => l.stop()); };
+  }, [sweep, arrow, glow]);
+
+  return (
+    <TouchableOpacity
+      onPress={onStart}
+      onPressIn={onPressIn}
+      onPressOut={onPressOut}
+      activeOpacity={0.9}
+      style={styles.button}
+      onLayout={(e) => setWidth(e.nativeEvent.layout.width)}
+      testID="splash-start"
+    >
+      {/* The sweep has its own clipped layer, so the arrow's glow can still spill out. */}
+      {width > 0 && (
+        <View style={styles.sweepClip} pointerEvents="none">
+          <Animated.View
+            style={[
+              styles.sweep,
+              { transform: [
+                { translateX: sweep.interpolate({ inputRange: [0, 1], outputRange: [-120, width + 40] }) },
+                { skewX: '-20deg' },
+              ] },
+            ]}
+          >
+            <LinearGradient
+              colors={['rgba(255,255,255,0)', 'rgba(255,255,255,0.10)', 'rgba(255,255,255,0)']}
+              start={{ x: 0, y: 0.5 }}
+              end={{ x: 1, y: 0.5 }}
+              style={StyleSheet.absoluteFill}
+            />
+          </Animated.View>
+        </View>
+      )}
+
+      <Text style={styles.buttonText}>Start now</Text>
+
+      <View style={styles.arrowSlot}>
+        <Animated.View
+          pointerEvents="none"
+          style={[
+            styles.arrowGlow,
+            {
+              opacity: glow.interpolate({ inputRange: [0, 1], outputRange: [0.25, 0.6] }),
+              transform: [{ scale: glow.interpolate({ inputRange: [0, 1], outputRange: [1, 1.28] }) }],
+            },
+          ]}
+        />
+        <View style={styles.arrow}>
+          <Animated.View
+            style={{
+              opacity: arrow.interpolate({ inputRange: [-1, 0, 1], outputRange: [0, 1, 0] }),
+              transform: [{ translateX: arrow.interpolate({ inputRange: [-1, 0, 1], outputRange: [-16, 0, 16] }) }],
+            }}
+          >
+            <ArrowRight color="#FFFFFF" size={18} strokeWidth={2.4} />
+          </Animated.View>
+        </View>
+      </View>
+    </TouchableOpacity>
   );
 }
 
@@ -149,9 +244,16 @@ const styles = StyleSheet.create({
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
     backgroundColor: '#0E1118', borderWidth: 1, borderColor: 'rgba(255,255,255,0.12)',
   },
+  sweepClip: { ...StyleSheet.absoluteFillObject, borderRadius: 30, overflow: 'hidden' },
+  sweep: { position: 'absolute', top: -10, bottom: -10, left: 0, width: 90 },
   buttonText: { color: '#FFFFFF', fontSize: 15, fontWeight: '500' },
+  arrowSlot: { width: 46, height: 46, alignItems: 'center', justifyContent: 'center' },
+  arrowGlow: {
+    position: 'absolute', width: 46, height: 46, borderRadius: 23, backgroundColor: ABYSS.blue,
+    ...(web ? ({ filter: 'blur(10px)' } as any) : null),
+  },
   arrow: {
     width: 46, height: 46, borderRadius: 23, backgroundColor: ABYSS.blue,
-    alignItems: 'center', justifyContent: 'center',
+    alignItems: 'center', justifyContent: 'center', overflow: 'hidden',
   },
 });
