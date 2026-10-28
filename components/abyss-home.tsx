@@ -18,6 +18,18 @@ import { LUX, LuxPill, LuxRule, rise, useEntrance, FocusFade } from '@/component
 const web = Platform.OS === 'web';
 const native = !web;
 
+// Soft glow round the trade panel and the cards, in EMC's blue (the robot's
+// own glow). Trial 28 Oct 2026: set to false to go back to plain edges.
+const GLOW = true;
+const glow = (rgb: string, strength = 1) => (GLOW ? {
+  borderColor: `rgba(${rgb}, ${0.42 * strength})`,
+  ...(web ? ({ boxShadow: `0 0 18px rgba(${rgb}, ${0.22 * strength}), 0 0 42px rgba(${rgb}, ${0.10 * strength}), inset 0 1px 0 rgba(255,255,255,0.06)` } as any) : {
+    shadowColor: `rgb(${rgb})`, shadowOpacity: 0.35 * strength, shadowRadius: 16, shadowOffset: { width: 0, height: 0 }, elevation: 6,
+  }),
+} : {});
+const EMC_BLUE = '80, 150, 255';
+const SOFT_RED = '248, 113, 113';
+
 type OtherEA = { id: string; name: string; image: string | null };
 
 type Props = {
@@ -51,7 +63,7 @@ function Row({ title, sub, onPress, testID, danger, Icon }: {
 }) {
   const tint = danger ? '#F87171' : LUX.white;
   return (
-    <TouchableOpacity style={[styles.card, danger && styles.cardDanger]} onPress={onPress} activeOpacity={0.7} testID={testID}>
+    <TouchableOpacity style={[styles.card, danger && styles.cardDanger, glow(danger ? SOFT_RED : EMC_BLUE, danger ? 0.7 : 0.8)]} onPress={onPress} activeOpacity={0.7} testID={testID}>
       <View style={[styles.cardIcon, danger && { borderColor: 'rgba(248,113,113,0.35)' }]}>
         <Icon color={tint} size={18} strokeWidth={1.6} />
       </View>
@@ -154,7 +166,7 @@ export function AbyssHome(p: Props) {
         <LuxRule progress={rule} />
 
         {/* One panel like TradePort's: News left, Trade in the centre, Scan right. */}
-        <Animated.View style={[styles.panel, rise(actions)]}>
+        <Animated.View style={[styles.panel, glow(EMC_BLUE), rise(actions)]}>
           <TouchableOpacity style={styles.side} onPress={p.onNews} activeOpacity={0.6} testID="action-fundamentals">
             <CalendarDays color={LUX.white} size={18} strokeWidth={1.6} />
             <Text style={styles.sideLabel}>NEWS</Text>

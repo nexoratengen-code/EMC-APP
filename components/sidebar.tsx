@@ -98,12 +98,13 @@ export function Sidebar() {
         {abyss && (
           <AbyssMenu
             items={[
-              ...NAV_ITEMS.map((i) => ({ key: i.key, label: i.label, route: i.route })),
-              { key: '/scanner', label: 'Chart Scanner', sub: 'AI-powered trade analysis', route: '/(tabs)/scanner' },
-              { key: '/license', label: 'Add New EA', sub: 'Have a valid license key', route: '/license' },
+              ...NAV_ITEMS.map((i) => ({ key: i.key, label: i.label, route: i.route, icon: i.icon })),
+              { key: '/scanner', label: 'Chart Scanner', sub: 'AI-powered trade analysis', route: '/(tabs)/scanner', icon: BarChart3 },
+              { key: '/license', label: 'Add New EA', sub: 'Have a valid license key', route: '/license', icon: Plus },
             ]}
             activeKey={pathname === '' || pathname === '/index' ? '/' : pathname}
             eaName={primaryEA?.name || null}
+            eaImage={primaryEAImage}
             running={isTestFlightRunning}
             onNav={handleNav}
             onClose={close}
