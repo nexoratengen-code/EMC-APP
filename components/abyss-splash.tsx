@@ -14,7 +14,8 @@ import { ABYSS } from '@/components/abyss-connect';
  * The picture is EMC's own robot (assets/images/emc-robot-hero.jpg: the app
  * icon with its grey ground taken down to black, set on a larger black canvas
  * and faded to pure black at every edge, so the glow is never cut off).
- * Same words as the old splash.
+ * The description is the dev's shorter line (28 Oct 2026), replacing the old
+ * paragraph; customer copy is the Boss's call before this goes live.
  *
  * Motion is slow and quiet, and skipped when the phone asks for reduced motion.
  */
@@ -103,7 +104,7 @@ export function AbyssSplash({ onStart }: { onStart: () => void }) {
         <View style={styles.bottom}>
           <Animated.Text style={[styles.title, rise(title)]}>EA Mobile{'\n'}Connect</Animated.Text>
           <Animated.Text style={[styles.description, rise(words)]}>
-            A cutting-edge mobile hosting platform designed to empower traders with a secure, reliable, and user-friendly environment for running their automated trading systems. Seamlessly manage your Expert Advisors (EAs) on the go, ensuring optimal performance and peace of mind.
+            Mobile hosting for your Expert Advisors. Connect MT5, manage your EAs and stay in control from anywhere.
           </Animated.Text>
 
           <Animated.View style={{ opacity: buttonRise.opacity, transform: [...buttonRise.transform, { scale: press }] }}>
@@ -141,7 +142,7 @@ const styles = StyleSheet.create({
   title: {
     color: '#FFFFFF', fontSize: 42, lineHeight: 46, fontWeight: '300', letterSpacing: -1.4, marginBottom: 14,
   },
-  description: { color: 'rgba(255,255,255,0.5)', fontSize: 13, lineHeight: 20, marginBottom: 26 },
+  description: { color: 'rgba(255,255,255,0.55)', fontSize: 15, lineHeight: 22, marginBottom: 28, maxWidth: 320 },
 
   button: {
     height: 60, borderRadius: 30, paddingLeft: 24, paddingRight: 7,
