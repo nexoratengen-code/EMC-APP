@@ -3,7 +3,7 @@ import {
   View, Text, StyleSheet, TouchableOpacity, SafeAreaView, ScrollView, Image, Platform, Animated, Easing,
   AccessibilityInfo, Modal,
 } from 'react-native';
-import { Menu, ChevronRight } from 'lucide-react-native';
+import { Menu, ChevronRight, CalendarDays, TrendingUp, Play, Square } from 'lucide-react-native';
 import { LUX, LuxPill, LuxRule, rise, useEntrance, FocusFade } from '@/components/abyss-lux';
 
 /**
@@ -147,16 +147,38 @@ export function AbyssHome(p: Props) {
         </Animated.Text>
         <LuxRule progress={rule} />
 
-        <Animated.View style={rise(actions)}>
-          <LuxPill label={p.botActive ? 'Stop' : 'Trade'} onPress={p.onTrade} testID="action-start" variant={p.botActive ? 'outline' : 'solid'} />
-          <View style={styles.pair}>
-            <View style={{ flex: 1 }}>
-              <LuxPill label="News" onPress={p.onNews} variant="outline" testID="action-fundamentals" />
+        {/* One panel like TradePort's: News left, Trade in the centre, Scan right. */}
+        <Animated.View style={[styles.panel, rise(actions)]}>
+          <TouchableOpacity style={styles.side} onPress={p.onNews} activeOpacity={0.6} testID="action-fundamentals">
+            <View style={styles.sideIcon}>
+              <CalendarDays color={LUX.white} size={18} strokeWidth={1.6} />
             </View>
-            <View style={{ flex: 1 }}>
-              <LuxPill label="Scan" onPress={p.onScan} variant="outline" testID="action-scan" />
+            <Text style={styles.sideLabel}>NEWS</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity style={styles.centre} onPress={p.onTrade} activeOpacity={0.8} testID="action-start">
+            <View
+              style={[
+                styles.tradeRing,
+                p.botActive && { borderColor: 'rgba(34,197,94,0.6)' },
+                web && ({ boxShadow: p.botActive ? '0 0 22px rgba(34,197,94,0.35)' : '0 0 26px rgba(255,255,255,0.18)' } as any),
+              ]}
+            >
+              <View style={[styles.tradeCore, p.botActive && styles.tradeCoreActive]}>
+                {p.botActive
+                  ? <Square color={LUX.white} size={18} fill={LUX.white} />
+                  : <Play color="#000000" size={22} fill="#000000" style={{ marginLeft: 3 }} />}
+              </View>
             </View>
-          </View>
+            <Text style={[styles.tradeLabel, p.botActive && { color: '#22C55E' }]}>{p.botActive ? 'STOP' : 'TRADE'}</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity style={styles.side} onPress={p.onScan} activeOpacity={0.6} testID="action-scan">
+            <View style={styles.sideIcon}>
+              <TrendingUp color={LUX.white} size={18} strokeWidth={1.6} />
+            </View>
+            <Text style={styles.sideLabel}>SCAN</Text>
+          </TouchableOpacity>
         </Animated.View>
 
         <Animated.View style={[styles.list, { opacity: list }]}>
@@ -225,7 +247,25 @@ const styles = StyleSheet.create({
   title: { color: LUX.white, fontSize: 44, lineHeight: 50, fontWeight: '200', letterSpacing: -1.5 },
   subtitle: { color: LUX.grey, fontSize: 15, fontWeight: '300', marginTop: 8 },
 
-  pair: { flexDirection: 'row', gap: 12, marginTop: 12 },
+  panel: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-around',
+    paddingVertical: 20, paddingHorizontal: 10, borderRadius: 28,
+    backgroundColor: '#0A0A0B', borderWidth: 1, borderColor: LUX.hairline,
+  },
+  side: { alignItems: 'center', width: 80, gap: 10 },
+  sideIcon: {
+    width: 46, height: 46, borderRadius: 23, alignItems: 'center', justifyContent: 'center',
+    borderWidth: 1, borderColor: 'rgba(255,255,255,0.18)',
+  },
+  sideLabel: { color: LUX.grey, fontSize: 11, fontWeight: '500', letterSpacing: 2.4 },
+  centre: { alignItems: 'center', gap: 10 },
+  tradeRing: {
+    width: 78, height: 78, borderRadius: 39, alignItems: 'center', justifyContent: 'center',
+    borderWidth: 1, borderColor: 'rgba(255,255,255,0.3)',
+  },
+  tradeCore: { width: 62, height: 62, borderRadius: 31, backgroundColor: LUX.white, alignItems: 'center', justifyContent: 'center' },
+  tradeCoreActive: { backgroundColor: 'transparent', borderWidth: 1, borderColor: 'rgba(34,197,94,0.6)' },
+  tradeLabel: { color: LUX.white, fontSize: 11, fontWeight: '600', letterSpacing: 2.4 },
 
   list: { marginTop: 40, borderTopWidth: 1, borderTopColor: LUX.hairline },
   listLabel: { color: LUX.grey, fontSize: 11, fontWeight: '500', letterSpacing: 2.4, marginTop: 18, marginBottom: 4 },
