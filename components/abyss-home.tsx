@@ -3,7 +3,7 @@ import {
   View, Text, StyleSheet, TouchableOpacity, SafeAreaView, ScrollView, Image, Platform, Animated, Easing,
   AccessibilityInfo, Modal,
 } from 'react-native';
-import { Menu, ChevronRight, CalendarDays, TrendingUp, Play, Square } from 'lucide-react-native';
+import { Menu, ChevronRight, CalendarDays, TrendingUp, Play, Square, BarChart3, Plus, Trash2, Repeat } from 'lucide-react-native';
 import { LUX, LuxPill, LuxRule, rise, useEntrance, FocusFade } from '@/components/abyss-lux';
 
 /**
@@ -44,11 +44,17 @@ type Props = {
   onSetupCancel: () => void;
 };
 
-function Row({ title, sub, onPress, testID, danger }: {
+/** A pill card in the same shape as the trade panel: icon, words, arrow. */
+function Row({ title, sub, onPress, testID, danger, Icon }: {
   title: string; sub?: string; onPress: () => void; testID?: string; danger?: boolean;
+  Icon: React.ComponentType<{ color?: string; size?: number; strokeWidth?: number }>;
 }) {
+  const tint = danger ? '#F87171' : LUX.white;
   return (
-    <TouchableOpacity style={styles.row} onPress={onPress} activeOpacity={0.6} testID={testID}>
+    <TouchableOpacity style={[styles.card, danger && styles.cardDanger]} onPress={onPress} activeOpacity={0.7} testID={testID}>
+      <View style={[styles.cardIcon, danger && { borderColor: 'rgba(248,113,113,0.35)' }]}>
+        <Icon color={tint} size={18} strokeWidth={1.6} />
+      </View>
       <View style={{ flex: 1 }}>
         <Text style={[styles.rowTitle, danger && { color: '#F87171' }]}>{title}</Text>
         {!!sub && <Text style={styles.rowSub}>{sub}</Text>}
@@ -184,15 +190,15 @@ export function AbyssHome(p: Props) {
             <>
               <Text style={styles.listLabel}>YOUR EAS</Text>
               {p.otherEAs.map((ea) => (
-                <Row key={ea.id} title={ea.name} sub="Tap to make it the active EA" onPress={() => p.onSwitchEA(ea.id)} />
+                <Row key={ea.id} Icon={Repeat} title={ea.name} sub="Tap to make it the active EA" onPress={() => p.onSwitchEA(ea.id)} />
               ))}
               <View style={{ height: 18 }} />
             </>
           )}
-          <Row title="Chart Scanner" sub="AI-powered trade analysis" onPress={p.onScan} testID="chart-scanner-card" />
-          <Row title="Quotes" sub="Live prices on your account" onPress={p.onQuotes} testID="action-quotes" />
-          <Row title="Add a New EA" sub="Have a valid license key" onPress={p.onAddEA} testID="add-ea-card" />
-          <Row title="Remove EA" onPress={p.onRemove} testID="action-remove" danger />
+          <Row Icon={BarChart3} title="Chart Scanner" sub="AI-powered trade analysis" onPress={p.onScan} testID="chart-scanner-card" />
+          <Row Icon={TrendingUp} title="Quotes" sub="Live prices on your account" onPress={p.onQuotes} testID="action-quotes" />
+          <Row Icon={Plus} title="Add a New EA" sub="Have a valid license key" onPress={p.onAddEA} testID="add-ea-card" />
+          <Row Icon={Trash2} title="Remove EA" onPress={p.onRemove} testID="action-remove" danger />
         </Animated.View>
 
         <Text style={styles.powered}>Powered by EA Mobile Connect</Text>
@@ -263,11 +269,18 @@ const styles = StyleSheet.create({
   tradeCoreActive: { backgroundColor: 'transparent', borderWidth: 1, borderColor: 'rgba(34,197,94,0.6)' },
   tradeLabel: { color: LUX.white, fontSize: 11, fontWeight: '600', letterSpacing: 2.4, textAlign: 'center', marginTop: 12 },
 
-  list: { marginTop: 40, borderTopWidth: 1, borderTopColor: LUX.hairline },
+  list: { marginTop: 36, gap: 12 },
   listLabel: { color: LUX.grey, fontSize: 11, fontWeight: '500', letterSpacing: 2.4, marginTop: 18, marginBottom: 4 },
-  row: {
-    flexDirection: 'row', alignItems: 'center', paddingVertical: 18,
-    borderBottomWidth: 1, borderBottomColor: LUX.hairline,
+  // Same family as the trade panel: dark, fine edge, fully rounded.
+  card: {
+    flexDirection: 'row', alignItems: 'center', gap: 14,
+    minHeight: 76, borderRadius: 38, paddingLeft: 14, paddingRight: 22, paddingVertical: 12,
+    backgroundColor: '#0A0A0B', borderWidth: 1, borderColor: 'rgba(255,255,255,0.16)',
+  },
+  cardDanger: { borderColor: 'rgba(248,113,113,0.28)' },
+  cardIcon: {
+    width: 48, height: 48, borderRadius: 24, alignItems: 'center', justifyContent: 'center',
+    borderWidth: 1, borderColor: 'rgba(255,255,255,0.18)',
   },
   rowTitle: { color: LUX.white, fontSize: 17, fontWeight: '300' },
   rowSub: { color: LUX.grey, fontSize: 13, fontWeight: '300', marginTop: 3 },
