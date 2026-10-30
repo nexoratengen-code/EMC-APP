@@ -18,26 +18,20 @@ const manifest = {
   "scope": "/",
   "lang": "en",
   "categories": ["finance", "business", "productivity"],
+  // Square icons cut from icon.png. icon.png itself is 1536x1024 and 2.3 MB:
+  // iOS will not use a picture that size or shape and draws a letter instead.
   "icons": [
     {
-      "src": "./assets/images/icon.png",
+      "src": "/assets/images/icon-192.png",
       "sizes": "192x192",
       "type": "image/png",
-      "purpose": "any maskable"
+      "purpose": "any"
     },
     {
-      "src": "./assets/images/adaptive-icon.png",
+      "src": "/assets/images/icon-512.png",
       "sizes": "512x512",
       "type": "image/png",
-      "purpose": "any maskable"
-    }
-  ],
-  "screenshots": [
-    {
-      "src": "./assets/images/icon.png",
-      "sizes": "1280x720",
-      "type": "image/png",
-      "form_factor": "wide"
+      "purpose": "any"
     }
   ],
   "related_applications": []
@@ -50,7 +44,7 @@ fs.writeFileSync(
 );
 
 // Copy icons to dist folder
-const iconFiles = ['icon.png', 'adaptive-icon.png', 'favicon.png'];
+const iconFiles = ['icon.png', 'adaptive-icon.png', 'favicon.png', 'apple-touch-icon.png', 'icon-192.png', 'icon-512.png'];
 
 iconFiles.forEach(file => {
   const srcPath = path.join(assetsPath, file);
@@ -67,6 +61,13 @@ iconFiles.forEach(file => {
     console.log(`Copied ${file} to dist/assets/images/`);
   }
 });
+
+// iOS also asks for /apple-touch-icon.png at the root, whatever the page says.
+const touchIcon = path.join(assetsPath, 'apple-touch-icon.png');
+if (fs.existsSync(touchIcon)) {
+  fs.copyFileSync(touchIcon, path.join(distPath, 'apple-touch-icon.png'));
+  console.log('Copied apple-touch-icon.png to dist/');
+}
 
 // Copy service worker to dist folder with build-time cache bust
 const swSrcPath = path.join(__dirname, '..', 'public', 'sw.js');
@@ -94,18 +95,9 @@ if (fs.existsSync(indexPath)) {
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black">
   <meta name="apple-mobile-web-app-title" content="EA Mobile Connect">
-  <link rel="apple-touch-icon" href="/assets/images/icon.png">
-  <link rel="apple-touch-icon" sizes="57x57" href="/assets/images/icon.png">
-  <link rel="apple-touch-icon" sizes="60x60" href="/assets/images/icon.png">
-  <link rel="apple-touch-icon" sizes="72x72" href="/assets/images/icon.png">
-  <link rel="apple-touch-icon" sizes="76x76" href="/assets/images/icon.png">
-  <link rel="apple-touch-icon" sizes="114x114" href="/assets/images/icon.png">
-  <link rel="apple-touch-icon" sizes="120x120" href="/assets/images/icon.png">
-  <link rel="apple-touch-icon" sizes="144x144" href="/assets/images/icon.png">
-  <link rel="apple-touch-icon" sizes="152x152" href="/assets/images/icon.png">
-  <link rel="apple-touch-icon" sizes="180x180" href="/assets/images/icon.png">
+  <link rel="apple-touch-icon" sizes="180x180" href="/assets/images/apple-touch-icon.png">
   <meta name="msapplication-TileColor" content="#000000">
-  <meta name="msapplication-TileImage" content="/assets/images/icon.png">
+  <meta name="msapplication-TileImage" content="/assets/images/icon-192.png">
   <meta name="theme-color" content="#000000">
   <meta name="apple-mobile-web-app-status-bar-style" content="black">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
@@ -153,8 +145,7 @@ if (fs.existsSync(indexPath)) {
     window.addEventListener('DOMContentLoaded', function() {
       // Preload critical images
       const criticalImages = [
-        '/assets/images/icon.png',
-        '/assets/images/adaptive-icon.png'
+        '/assets/images/icon-192.png'
       ];
       
       criticalImages.forEach(function(src) {
