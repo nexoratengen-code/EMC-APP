@@ -20,6 +20,7 @@ export default function LoginScreen() {
   const [modalTitle, setModalTitle] = useState<string>('');
   const [modalMessage, setModalMessage] = useState<string>('');
   const [paymentVisible, setPaymentVisible] = useState<boolean>(false);
+  const [renewing, setRenewing] = useState<boolean>(false);
   // In-app paywall (components/paywall.tsx). "I've paid, continue" re-checks;
   // a re-check that still finds no payment says so on the paywall.
   const [paywallNotice, setPaywallNotice] = useState<string>('');
@@ -109,7 +110,7 @@ export default function LoginScreen() {
           ? "We haven't received your payment yet. If you just paid, give it a minute and tap \"I've paid, continue\" again."
           : '');
         recheckRef.current = false;
-        setPaymentVisible(true);
+        setRenewing(!!(account as any).expired); setPaymentVisible(true);
         return;
       }
 
@@ -162,6 +163,7 @@ export default function LoginScreen() {
         accentRgb={a}
         notice={paywallNotice}
         checking={isLoading}
+        renewing={renewing}
         onBack={() => { setPaymentVisible(false); setPaywallNotice(''); }}
         onContinue={() => { recheckRef.current = true; handleProceed(); }}
       />
@@ -180,7 +182,7 @@ export default function LoginScreen() {
         onProceed={handleProceed}
         modal={{ visible: modalVisible, title: modalTitle, message: modalMessage }}
         onDismissModal={() => setModalVisible(false)}
-        onReactivate={() => { setModalVisible(false); setPaywallNotice(''); setPaymentVisible(true); }}
+        onReactivate={() => { setModalVisible(false); setPaywallNotice(''); setRenewing(true); setPaymentVisible(true); }}
         onReactivateLink={() => {
           if (!email.normalize('NFKC').includes('@')) {
             setModalTitle('Enter your email');
@@ -189,7 +191,7 @@ export default function LoginScreen() {
             return;
           }
           setPaywallNotice('');
-          setPaymentVisible(true);
+          setRenewing(true); setPaymentVisible(true);
         }}
       />
     );
@@ -293,7 +295,7 @@ export default function LoginScreen() {
                     return;
                   }
                   setPaywallNotice('');
-                  setPaymentVisible(true);
+                  setRenewing(true); setPaymentVisible(true);
                 }}
                 activeOpacity={0.7}
                 hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
@@ -343,7 +345,7 @@ export default function LoginScreen() {
                 onPress={() => {
                   setModalVisible(false);
                   setPaywallNotice('');
-                  setPaymentVisible(true);
+                  setRenewing(true); setPaymentVisible(true);
                 }}
                 activeOpacity={0.8}
               >
