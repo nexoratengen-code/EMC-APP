@@ -24,8 +24,6 @@ const PLANS = [
   { plan: 365, ref: 'converter_365_', label: '1 Year',   sub: '365 days of access', price: 'US$139.18', save: 'Save 70%' },
 ] as const;
 type Plan = (typeof PLANS)[number];
-// Half price for a customer renewing. The checkout page looks the email up and takes the same amounts.
-const RENEW_PRICES: Record<number, string> = { 30: 'US$19.59', 90: 'US$34.59', 365: 'US$69.59' };
 const BENEFITS = ['Mobile VPS Access', 'One Payment, No Automatic Renewal', 'Pay Again Only When You Choose', 'Hands-Free Mobile EA Hosting'];
 
 // Same link the shop builds: lower-cased email, hex of its UTF-8 bytes, term prefix.
@@ -41,14 +39,11 @@ interface Props {
   accentRgb: string;
   notice?: string;
   checking?: boolean;
-  renewing?: boolean;
   onBack: () => void;
   onContinue: () => void; // "I've paid" — re-checks the account
 }
 
-export function Paywall({ email, accent, accentRgb, notice, checking, renewing, onBack, onContinue }: Props) {
-  const priceOf = (p: Plan) => (renewing ? RENEW_PRICES[p.plan] : p.price);
-  const saveOf = (p: Plan) => (renewing ? '50% off' : p.save);
+export function Paywall({ email, accent, accentRgb, notice, checking, onBack, onContinue }: Props) {
   const [agreed, setAgreed] = useState(false);
   const [opened, setOpened] = useState(false);
   const [plan, setPlan] = useState<Plan>(PLANS[0]);
@@ -108,15 +103,15 @@ export function Paywall({ email, accent, accentRgb, notice, checking, renewing, 
                 <View style={{ flex: 1 }}>
                   <View style={styles.planTop}>
                     <Text style={styles.planLabel}>{p.label}</Text>
-                    {saveOf(p) ? (
+                    {p.save ? (
                       <View style={[styles.saveChip, { backgroundColor: `rgba(${accentRgb}, 0.18)` }]}>
-                        <Text style={[styles.saveText, { color: accent }]}>{saveOf(p)}</Text>
+                        <Text style={[styles.saveText, { color: accent }]}>{p.save}</Text>
                       </View>
                     ) : null}
                   </View>
                   <Text style={styles.planSub}>{p.sub}</Text>
                 </View>
-                <Text style={styles.planPrice}>{priceOf(p)}</Text>
+                <Text style={styles.planPrice}>{p.price}</Text>
               </TouchableOpacity>
             );
           })}
@@ -139,7 +134,7 @@ export function Paywall({ email, accent, accentRgb, notice, checking, renewing, 
             style={[styles.payBtn, { backgroundColor: agreed ? accent : 'rgba(255,255,255,0.06)', boxShadow: agreed ? `0 10px 36px -8px rgba(${accentRgb}, 0.8)` : 'none' } as any]}
             testID="pay"
           >
-            <Text style={[styles.payText, { color: agreed ? '#fff' : 'rgba(255,255,255,0.35)' }]}>Pay {priceOf(plan)}</Text>
+            <Text style={[styles.payText, { color: agreed ? '#fff' : 'rgba(255,255,255,0.35)' }]}>Pay {plan.price}</Text>
           </TouchableOpacity>
           <View style={styles.secure}>
             <ShieldCheck size={13} color="rgba(255,255,255,0.45)" />
