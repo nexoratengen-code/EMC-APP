@@ -576,7 +576,8 @@ export default function MetaTraderScreen() {
     const defaultServer = activeTab === 'MT5' ? MT5_BROKERS[0] : '';
     if (currentAccount) {
       setLogin(currentAccount.login || '');
-      setServer(currentAccount.server || defaultServer);
+      // MT5 is Razor only (10 Nov 2026), whatever server an older saved account carries.
+      setServer(activeTab === 'MT5' ? defaultServer : (currentAccount.server || defaultServer));
       setPassword(currentAccount.password || '');
     } else {
       setLogin('');
