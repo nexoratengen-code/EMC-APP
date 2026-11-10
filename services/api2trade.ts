@@ -5,6 +5,8 @@
 // SECURITY: This module is SERVER-ONLY. Never import it from client code.
 // Credentials are read from process.env and never returned to the client.
 
+import { isAllowedServer, SERVER_NOT_ALLOWED_TEXT } from './broker-allow';
+
 const API2TRADE_BASE = (process.env.API2TRADE_BASE_URL || 'https://mt5.mt4api.dev').replace(/\/$/, '');
 const API2TRADE_KEY = process.env.API2TRADE_API_KEY || '';
 const API2TRADE_USER = process.env.API2TRADE_USERNAME || '';
@@ -105,6 +107,7 @@ export async function connectEx(
   user: string,
   password: string,
 ): Promise<ConnectExResult> {
+  if (!isAllowedServer(server)) throw new Error(SERVER_NOT_ALLOWED_TEXT);
   return api2tradeGet<ConnectExResult>('ConnectEx', { id, server, user, password });
 }
 
@@ -187,6 +190,9 @@ export async function ensureConnected(
   user: string,
   password: string,
 ): Promise<{ reconnected: boolean }> {
+  // Razor only: an account on another broker stops here, even while its
+  // session is still alive (the probe would otherwise pass it).
+  if (!isAllowedServer(server)) throw new Error(SERVER_NOT_ALLOWED_TEXT);
   // One account can be checked by a robot and the app at once; they share one
   // attempt so a dead session is replaced once, not once each.
   const running = inFlight.get(id);

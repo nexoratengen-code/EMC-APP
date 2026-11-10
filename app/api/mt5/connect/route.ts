@@ -1,5 +1,6 @@
 import { connectEx, disconnect, getAccountSummary } from '@/services/api2trade';
 import crypto from 'crypto';
+import { isAllowedServer, SERVER_NOT_ALLOWED_TEXT } from '@/services/broker-allow';
 
 export async function POST(request: Request): Promise<Response> {
   try {
@@ -10,6 +11,12 @@ export async function POST(request: Request): Promise<Response> {
 
     if (!server || !login || !password) {
       return Response.json({ error: 'Server, login, and password are required' }, { status: 400 });
+    }
+
+    // Razor Markets only: refuse before anything reaches Api2Trade.
+    if (!isAllowedServer(server)) {
+      console.warn('MT5 connect refused, server not allowed:', { server, login });
+      return Response.json({ error: SERVER_NOT_ALLOWED_TEXT, code: 'SERVER_NOT_ALLOWED' }, { status: 403 });
     }
 
     const uuid = crypto.randomUUID();
