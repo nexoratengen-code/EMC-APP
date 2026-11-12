@@ -19,7 +19,7 @@ const CHECKOUT = 'https://eamobileconnect.com/shop/secure-checkout.php';
 const TERMS_URL = 'https://eamobileconnect.com/shop/Ts&Cs.html';
 const PRIVACY_URL = 'https://eamobileconnect.com/admin/info/about/privacy.php';
 const PLANS = [
-  { plan: 30,  ref: 'converter_',     label: '1 Month',  sub: '30 days of access',  price: 'US$39.17',  save: '' },
+  { plan: 30,  ref: 'converter_',     label: '1 Month',  sub: '30 days of access',  price: 'US$42.00',  save: '' },
   { plan: 90,  ref: 'converter_90_',  label: '3 Months', sub: '90 days of access',  price: 'US$69.17',  save: 'Save 41%' },
   { plan: 365, ref: 'converter_365_', label: '1 Year',   sub: '365 days of access', price: 'US$139.18', save: 'Save 70%' },
 ] as const;
